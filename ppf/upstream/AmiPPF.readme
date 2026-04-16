@@ -1,0 +1,28 @@
+Short:        Applies PPF-Patches to PSX-Images   V1.0
+Author:       AmiPPF@yahoo.de
+Type:         util/patch
+Version:      1.0
+Requires:     MUI, MakeCD, CD-R supporting RawBlockMode
+Architecture: m68k-amigaos
+Distribution: NoCD
+
+Does the same as ApplyPPF.exe (DOS), PPF-O-MATIC (WIN) or ppf4linux
+(Linux/x86): It applies a V1.0/2.0 PPF-patch (trainer, PAL/NTSC
+selector, ...) to a PSX image file.
+
+Use MakeCD (other burner software untested, but may work, too) in
+"Raw Block Contents" mode to generate the image file, then start
+AmiPPF. The patch file contains a checksum to test whether the
+image generation worked properly or not.
+
+AmiPPF supports the following ToolTypes:
+
+    PSX_PATH    default path to PSX image files
+    PPF_PATH    default path to PPF patches
+
+The lenght test for the PSX image file is disabled due to the
+different formats of CD-R Win and MakeCD.
+
+OK, have fun with the PSX games
+and long lives AMIGA...
+JBI
