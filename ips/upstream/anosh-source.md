@@ -223,3 +223,39 @@ many patchers stop parsing records when encountering this value.
   in big-endian format.</span>
 - <span id="foot5">[^](#ref6) The spec allows for overlapping
   offsets.</span>
+
+---
+
+## Notes on this source
+
+anosh.se is the most detailed community writeup of the IPS format,
+but it is a secondary synthesis source: its record-format tables
+are sourced from ZeroSoft (footnote 3), and its analytical sections
+(max file size, max record count, etc.) are the author's own
+arithmetic applied to the field widths. Where anosh derives a
+number, that derivation is anosh's, not the format's — the format
+has no specification to derive from. The writeup also contains
+several internal contradictions and at least one uncorrected error
+in the summary.
+
+### Errors and inconsistencies
+
+- **Minimum IPS file size**: claimed as 5 bytes. Should be 8
+  (5-byte `PATCH` header + 3-byte `EOF` footer). The article's own
+  format description requires both.
+- **Summary record count**: "IPS files can contain up to 65535
+  records" contradicts the earlier section computing 2^24 - 1
+  records. 65535 (2^16 - 1) is the max record *payload size*, not
+  the max record count.
+- **Summary size range**: "between 5 bytes and 80 mebibytes" — the
+  5-byte minimum is wrong (see above), and the 80 MiB figure is
+  unexplained and contradicts the 128 MiB calculation in the
+  preceding section.
+- **Max IPS file-size record count**: the body computes 2^24 - 1
+  RLE records, but the article separately notes the EOF sentinel
+  makes offset 0x454F46 unusable. This means at most 2^24 - 2
+  offsets are safe, so the theoretical max record count should be
+  2^24 - 2, not 2^24 - 1. The 128 MiB figure is affected only
+  trivially (by 8 bytes), but the inconsistency is there.
+- **No mention of truncation**: anosh does not describe the
+  truncation extension documented by sneslab and archiveteam.
