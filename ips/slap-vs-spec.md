@@ -44,28 +44,56 @@ mechanism elsewhere.
 
 ## Needs change: createIPS doesn't emit truncation marker
 
-`createIPS` passes `Nothing` for truncation unconditionally
-(`Create.hs:104`). If target < source, the shrinkage is silently
-lost — the applied patch yields `max(sourceSize, maxRecordEnd)`
-bytes, not the actual target size.
+### The situation
 
-Meanwhile `createIPS32` and `createEBP` return
-`Left CannotExpressTargetShrinkage` when target < source. And
-`parseIPS` already accepts truncation markers. And
-`encodeIPSPatch` already has `encodeTruncationMarker`. The
-create/parse pair is asymmetric: parse accepts what create never
-produces.
+**Growing** (target > source) works everywhere. The optimizer's
+`tailExtension` (`Optimize.hs:144-150`) captures all bytes past
+the source end as a hunk. On apply, the output is
+`max(sourceSize, maxRecordEnd)`, source is copied, the rest is
+zero-filled, records overlay. No issues.
 
-We haven't thought this through enough and don't have enough data
-on what other tools do, which would inform our decision. The
-parser supports truncation. The encoder has the machinery. The
-creator doesn't use it.
+**Shrinking** (target < source) is where slap diverges from both
+reference implementations.
 
-**Design space:** if we can exercise a feature (parse truncation)
-then we should be able to create with it. But some consumers may
-not support truncation. Options:
+Both Flips and RomPatcher.js emit a 3-byte truncation marker
+after `EOF` when creating a StandardIPS patch where target <
+source:
+- Flips (`libips.cpp:344`):
+  `if (sourcelen > targetlen) write24(targetlen);`
+- RomPatcher.js (`RomPatcher.format.ips.js:198-199`):
+  `if(modified.fileSize < original.fileSize) patch.truncate = modified.fileSize;`
 
-- Always emit truncation when target < source.
+On apply, both use the truncation marker as the output size,
+capping or expanding accordingly. The marker means "ensure output
+is exactly this size" — it can shrink or grow.
+
+slap's apply side handles truncation correctly: if
+`ipsTruncatedTargetSize` is `Just declared`, that's the target
+size. The parser accepts truncation markers. The encoder has
+`encodeTruncationMarker`. But `createIPS` passes `Nothing`
+unconditionally (`Create.hs:104`). If target < source, the
+shrinkage is silently lost — the applied patch yields
+`max(sourceSize, maxRecordEnd)` bytes, not the actual target
+size.
+
+`createIPS32` and `createEBP` return
+`Left CannotExpressTargetShrinkage` when target < source, which
+is correct — IPS32 has no truncation marker and EBP's trailer
+slot is occupied by JSON metadata.
+
+### What to do
+
+The create/parse pair is asymmetric: parse accepts what create
+never produces. Both reference implementations emit the marker.
+slap's encoder already has the machinery.
+
+**Design space:** if we can parse a feature (truncation) then we
+should be able to create with it. But some consumers may not
+support truncation (the archiveteam wiki: "Not every patching
+program will implement this extension"). Options:
+
+- Always emit truncation when target < source. Matches Flips
+  and RomPatcher.js. Simplest.
 - Have a flag or mode to control it.
 - Treat "IPS with truncation" and "maximally vanilla IPS" as
   distinct output modes, similar to how rfc-vcdiff and xdelta3
