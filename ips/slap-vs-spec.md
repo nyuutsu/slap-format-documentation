@@ -107,68 +107,57 @@ contract (documented in the comment at Create.hs:316-330) says
 it's only called from the with-source path where the optimizer
 guarantees the source is large enough.
 
-### What to fix: `narrowHunks` is doing too much
+### What to fix
 
-`narrowHunks` is a general function in `Measure.hs`. It should
-ask a general question: "does this record fit within this format's
-offset range?" The sentinel is an IPS-specific concern that
-doesn't belong in `EncodingLimits`, a structure shared by PPF,
-NINJA, PMSR, and every other format.
+Both problems are one fix. Currently sentinel handling is split:
+`narrowHunks` rejects collisions in the no-source path,
+`avoidSentinel` fixes them in the with-source path, and the
+with-source path strips the sentinel from `EncodingLimits` to
+stop `narrowHunks` from rejecting what `avoidSentinel` is about
+to fix. Two mechanisms, selective enabling per path,
+comment-enforced safety.
+
+Replace with one mechanism:
 
 1. **Remove `sentinelOffset` from `EncodingLimits`.** Let
-   `narrowHunks` be purely about offset ranges.
+   `narrowHunks` be purely about offset ranges — a general
+   question for a general function. The sentinel is IPS-specific
+   and doesn't belong in a structure shared by every format.
 
-2. **Add an IPS-specific sentinel resolution step.** After
-   `narrowHunks` validates offset ranges, a new IPS-only step
-   checks for sentinel collisions. It either resolves them (if
-   source bytes available) or rejects with a useful message:
-   "record at offset 0x454F46 collides with the IPS EOF marker;
-   conversion requires source bytes to resolve this." This step
-   doesn't exist yet; the work is currently split between
-   `narrowHunks` (generic reject) and `avoidSentinel` (fix-up).
+2. **Replace `avoidSentinel` with a unified, fallible sentinel
+   resolution function.** Takes the sentinel offset, source bytes
+   (possibly empty), and the record list. For each record at the
+   sentinel offset:
+   - Source byte at `offset - 1` available: shift back, prepend.
+     Return the fixed record.
+   - Source byte unavailable: return an error explaining the
+     problem and what would fix it ("record at offset 0x454F46
+     collides with the IPS EOF marker; conversion requires source
+     bytes to resolve this").
 
-3. **The direct-conversion error message improves for free.** The
-   current error comes from `narrowHunk` and reads as a generic
-   encoding-limits violation. The new IPS-specific step would
-   explain *why* and *what would fix it*.
+   Signature: something like
+   `resolveSentinelCollisions :: Offset -> ByteString -> [EncodedHunk] -> Either SlapError [EncodedHunk]`.
 
-### What to fix: `avoidSentinel` safety is comment-enforced
+   Both paths use this. The with-source path gets fixes. The
+   without-source path gets clear errors. No choreography, no
+   stripping fields, no comment-contracts.
 
-`avoidSentinel` is total. If it can't fix a sentinel collision,
-it silently produces a corrupt patch. Its safety depends on a
-contract written in a comment: "only called from the with-source
-path where the optimizer guarantees the source covers the
-sentinel offset."
+3. **The silent pass-through is eliminated.** The current
+   `avoidSentinel` has an `| otherwise = record` branch: if it
+   encounters a collision it can't fix, it silently produces a
+   corrupt patch. The safety of that branch depends on a comment
+   saying it can't fire. In the unified function, that branch
+   becomes an `Either` — the compiler forces callers to handle
+   the failure case. There is no "encounter a collision and do
+   nothing" path.
 
-The contract holds today. But it's the kind of contract you have
-to read the comment and hold in your head. Someone working on the
-optimizer, or calling `avoidSentinel` from a new context, wouldn't
-know they're responsible for maintaining this invariant unless
-they find and read that comment.
+4. **The error message improves for free.** Currently the
+   no-source rejection comes from `narrowHunk` and reads as a
+   generic encoding-limits violation. The new function explains
+   *why* and *what would fix it*.
 
-Options for making it structural:
-
-- **Make it fallible.** Return `Either SlapError [EncodedHunk]`.
-  If it encounters a sentinel collision it can't fix, it fails.
-  The with-source path always gets `Right` (the precondition
-  still holds), but if someone breaks the precondition, they get
-  a compile-time-visible `Either` they must handle, not silent
-  corruption. Cost: callers handle an `Either` that currently
-  can't fail. This is small.
-
-- **Encode the precondition in the type.** Instead of a raw
-  `ByteString` for source, take a type that witnesses "this
-  source covers the sentinel offset." Heavier — adds a type that
-  exists only to carry a proof. Makes the invariant unbreakable
-  but costs readability.
-
-- **Assert at the call site.** Guard in `encodeIPSPatch` that
-  checks before calling `avoidSentinel`. Lightest touch — the
-  function stays total, the invariant is checked once. But
-  someone adding a new call site could skip the guard.
-
-The fallible option is probably the sweet spot. The `Either` in
-the signature is self-documenting: anyone calling
-`avoidSentinel` sees it might fail, the compiler forces them to
-handle that, and a new call path that breaks the precondition
-gets a clear error instead of a corrupt patch.
+Priority: low. Converting *to* IPS is a downgrade that basically
+shouldn't happen. The collision is ~1 in 2,000 for large patches
+and only matters in the conversion path. But the structural
+cleanup (separating IPS baggage from `EncodingLimits`) is worth
+doing regardless of how often the sentinel fires.
