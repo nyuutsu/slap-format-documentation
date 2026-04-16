@@ -73,17 +73,27 @@ not support truncation. Options:
   shape might call for a layer where "maximally vanilla IPS" is
   a mode.
 
-## Notable: sentinel avoidance silently passes through when source unavailable
+## Sentinel avoidance: actually fine
 
-`avoidSentinel` is a no-op if the source is too short to read the
-byte preceding the sentinel offset. In direct conversion (no ROM),
-a record at the sentinel offset will be left in place — the
-resulting patch will be misread by parsers that stop at `0x454F46`.
-The audit says "the encoder must reject" but the code doesn't
-reject, it silently passes through. Contract tests
-(`prop_ipsSentinelDirect` etc.) catch this at test time.
+Initial review claimed `avoidSentinel` silently passes through
+when the source is unavailable. On closer reading, there are two
+separate paths:
 
-When touching `Create.hs` or the sentinel avoidance path, check
-whether encode-time rejection is warranted for the
-source-unavailable case, or whether the test-time contract check
-is sufficient.
+- **Direct conversion (no source):** `convertDirect`
+  (`Convert.hs:422-425`) passes `encodingLimits` with the
+  sentinel included. `narrowHunks` validates each hunk and
+  `narrowHunk` (`Measure.hs:407-412`) rejects any hunk at the
+  sentinel offset. The conversion fails with an error before
+  `avoidSentinel` is ever reached. This is correct.
+
+- **With-source creation:** `createFromMemory`
+  (`Convert.hs:566-568`) strips the sentinel from limits because
+  `avoidSentinel` will fix it at encode time. The source is the
+  actual ROM, so the sentinel offset (0x454F46, ~4.3 MiB) is
+  reachable only if the ROM is at least that large — and if it
+  is, the preceding byte is available and the shift works. The
+  silent pass-through condition (source too short for the
+  sentinel offset) can't arise when the optimizer only produces
+  records within the source/target diff range.
+
+The two paths together cover both cases correctly. No fix needed.
