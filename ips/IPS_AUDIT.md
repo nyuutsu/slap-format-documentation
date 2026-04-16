@@ -12,11 +12,14 @@ silent, I flag the call as a judgment and give the data points I found.
 
 ## 1. Wire format reconstruction
 
-IPS has no canonical spec. The original ZeroSoft document
-(`zerosoft.zophar.net/ips.php`) is short and covers only the base record
-format. Everything else — 32-bit offsets, truncation marker, EBP metadata,
-EOF sentinel avoidance — is de-facto-from-one-implementation, codified by
-community convention across two or three downstream tools.
+IPS has no canonical spec. The ZeroSoft document
+(`zerosoft.zophar.net/ips.php`, now mirrored in
+`upstream/zerosoft-source.md`) is short and covers only the base record
+format — and has garbled unit conversions in its preamble, though the
+tables themselves are sound. Everything else — 32-bit offsets, truncation
+marker, EBP metadata, EOF sentinel avoidance — is de-facto-from-one-
+implementation, codified by community convention across two or three
+downstream tools.
 
 ### 1.1 StandardIPS (`PATCH` / `EOF`)
 
@@ -43,24 +46,36 @@ RLE record (size == 0):
 ```
   offset       3 bytes  big-endian, 0..0xFFFFFF
   size         2 bytes  big-endian, 0              (sentinel)
-  rle_size     2 bytes  big-endian, 1..0xFFFF      (zero is invalid)
+  rle_size     2 bytes  big-endian, 1..0xFFFF      (ZeroSoft: "Any nonzero value")
   value        1 byte   fill byte
 ```
 
-Hard limits:
-- Max patchable offset is `0xFFFFFF` = 16 MiB − 1.
+Hard limits (arithmetic on field widths, not values in the format):
+- Max offset is `0xFFFFFF` = 16 MiB − 1.
 - Max record payload is `0xFFFF` = 65535 bytes.
-- Therefore the highest byte a single record can touch is
-  `0xFFFFFF + 0xFFFF = 0x100FFFE = 16,842,750` — the Archiveteam wiki
-  quotes this verbatim: "IPS patches cannot affect bytes beyond offset
-  16842750 (0x100fffe = 0xffffff + 0xffff)."
+- Therefore the highest byte a single record can touch is at
+  position `0xFFFFFF + 0xFFFF - 1 = 0x100FFFD = 16,842,749`
+  (the last of 0xFFFF bytes written starting at offset 0xFFFFFF).
+  The Archiveteam wiki phrases the same limit as an exclusive
+  bound: "IPS patches cannot affect bytes beyond offset 16842750
+  (0x100fffe = 0xffffff + 0xffff)."
+- Flips refuses to create patches for targets > 16,777,216 bytes
+  (`libips.cpp:202`, verified locally).
 
 Truncation marker: after `EOF`, per the Archiveteam wiki, "the
 end-of-file marker may be followed by a three-byte length to which the
 resulting file should be truncated. Not every patching program will
-implement this extension, however." Flips does implement it, writing
-`write24(targetlen)` when `sourcelen > targetlen`. slap should honor
-it for StandardIPS. The wiki is silent on IPS32 truncation (§1.2).
+implement this extension, however." Flips does implement it: on create,
+`write24(targetlen)` when `sourcelen > targetlen` (`libips.cpp:344`,
+verified locally); on parse, reads truncation only when exactly 3 bytes
+remain (`patchat+3 == patchend`, `libips.cpp:77`, verified locally).
+slap should honor it for StandardIPS. The wiki is silent on IPS32
+truncation (§1.2).
+
+Note: SNESTool v1.2's DOC describes a concept called "IPS 2" for
+cutting files, distinct from standard IPS. Whether this is the same
+mechanism as the 3-byte truncation trailer or something else is
+unknown — see `spec.md` "Truncate extension" for the full discussion.
 
 ### 1.2 IPS32 (`IPS32` / `EEOF`)
 
@@ -135,11 +150,16 @@ as one of the format's named pitfalls:
 
 Encoder convention (matches the wiki exactly): shift the record offset
 back by one and extend the payload forward by one, prepending the
-source byte at `offset − 1`. Flips `libips.cpp` implements it as:
+source byte at `offset − 1`. Flips `libips.cpp` implements it as
+(`libips.cpp:247-251`, verified locally):
 
 ```c
   if (offset == 0x454F46) { offset--; thislen++; }   // avoid premature EOF
 ```
+
+On the parse side, Flips loops `while (offset != 0x454F46)` — an
+unconditional hard stop with no lookahead (`libips.cpp:53`, verified
+locally). A record at this offset is unparseable in Flips.
 
 This assumes the encoder has the source bytes to look up. Without a
 source (direct IPS→IPS conversion with no ROM), the sentinel is
@@ -767,16 +787,29 @@ the rewrite.
 ## 8. Notes on sources
 
 - `zerosoft.zophar.net/ips.php` — base-spec (PATCH/EOF, record format,
-  RLE format). Fetched directly.
+  RLE format). Now mirrored locally in `upstream/zerosoft-source.md`.
+  Note: the preamble has garbled unit conversions ("2^24-1 bits (2047
+  Mb)") but the record-format tables are sound. This is the origin of
+  the "Any nonzero value" RLE_Size constraint that anosh.se repeats.
 - `fileformats.archiveteam.org` wiki page on IPS — confirmation of
   base-spec, sentinel-avoidance pitfall (quoted in §1.4), truncation
   extension language (quoted in §1.1). Originally unreachable from
   this session (ECONNREFUSED); pasted in by the user after the first
   draft.
-- IPS32, EBP, and the exact byte-level shape of the Flips truncation
-  extension: research-subagent pass against Flips `libips.cpp`,
-  `leoetlino/sips`, `Lyrositor/EBPatcher`, SnesLab, and nesdev. None
-  of these are spec-like; they are single-implementation de-facto.
+- Flips `libips.cpp` — available locally at `tools/flips/libips.cpp`.
+  Key claims about Flips behavior in this document (sentinel avoidance
+  at line 247, truncation emit at line 344, truncation parse at line
+  77, RLE-zero rejection at line 59, EOF loop at line 53) were
+  verified against the local source during a later accuracy review.
+- IPS32, EBP: research-subagent pass against `leoetlino/sips`,
+  `Lyrositor/EBPatcher`, SnesLab, and nesdev. None of these are
+  spec-like; they are single-implementation de-facto.
+- SNESTool DOC (`upstream/SNESTL12.DOC`, mirrored as
+  `upstream/SNESTL12.md`): 1996 release notes. Historical source for
+  provenance and the "IPS 2" cutting concept. Not a technical
+  specification — it does not describe the wire format. Claims from
+  this source should be attributed as "SNESTool's DOC says" rather
+  than presented as format facts.
 
 Judgment calls flagged in §7 stem from the gaps between these
 sources: the Archiveteam wiki and ZeroSoft describe only StandardIPS,

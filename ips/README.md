@@ -26,15 +26,30 @@ For the full on-disk structure and the edge cases, see `spec.md`.
 - `spec.md` — our writeup of the format's on-disk structure,
   compiled from multiple community sources since no authoritative
   spec exists.
+- `proposal.md` — resolved design questions for slap's IPS
+  implementation.
+- `IPS_AUDIT.md` — detailed audit brief for the IPS module rewrite.
 - `upstream/snestl12.zip` — the archive as downloaded from
   [romhacking.net utility #18](https://www.romhacking.net/utilities/18).
-  SNESTool v1.2 by "THE MCA" of ELITE, dated February 12, 1996. DOS
-  tool. Supports IPS creation and application among many other SNES
-  ROM utilities.
+  SNESTool v1.2 by "THE MCA" of ELITE, dated February 12, 1996.
+  DOS tool. Supports IPS creation and application among many other
+  SNES ROM utilities.
 - `upstream/SNESTL12.DOC` — the tool's documentation, extracted for
-  convenience. Contains internal origin claims (see below).
+  convenience. Contains internal origin claims (see below). This is
+  a historical source — release notes from one scene developer, not
+  a technical specification.
 - `upstream/SNESTL12.EXE` — the tool binary, extracted for
   convenience.
+- `upstream/zerosoft-source.md` — the ZeroSoft IPS spec
+  (`zerosoft.zophar.net/ips.php`), the closest thing to a base
+  specification that exists. Cited by anosh.se. Has unit errors.
+- `upstream/anosh-source.md` — the anosh.se writeup. Most detailed
+  community source but contains internal contradictions (noted in
+  the file's error appendix).
+- `upstream/archiveteam-source.md` — the archiveteam wiki page.
+  Brief, careful.
+- `upstream/sneslab-source.md` — the sneslab wiki page. Brief,
+  format-focused, documents the truncation extension.
 
 ## Origin claims
 
@@ -63,10 +78,12 @@ reconstruction.
 
 Caveats:
 - The claim doesn't establish a date. SNESTool 1.2 is from February
-  1996 but the IPS feature existed in earlier SNESTool versions,
-  and the changelog in this same DOC file mentions IPS fixes going
-  back to at least v1.04. The earliest SNESTool version isn't
-  documented in the archive we have.
+  1996 (EXE timestamp; the DOC timestamp is January 1, 1996). IPS
+  support existed from the first SNESTool version — the v1.0-to-
+  v1.01 changelog already mentions IPS bugs. The DOC also describes
+  a concept called "IPS 2" for cutting (truncating) files,
+  implying that standard IPS did not support shrinking. See
+  `spec.md` "Truncate extension" for details.
 - "Invented" is ambiguous. It could mean "designed the format" or
   "wrote the first implementation." Formats that are "just a file
   structure" often get designed organically and attributed later.
@@ -75,15 +92,22 @@ Caveats:
 
 ### Later community writeups
 
+- [zerosoft.zophar.net/ips.php](https://zerosoft.zophar.net/ips.php)
+  — the closest thing to a base spec. Describes the record format
+  and RLE encoding. Has garbled unit conversions (see error notes
+  in `upstream/zerosoft-source.md`). No origin claims.
 - [fileformats.archiveteam.org](http://fileformats.archiveteam.org/wiki/IPS_(binary_patch_format))
   — general overview, origin not documented
-- [anosh.se/ips](https://www.anosh.se/ips/) — detailed format
-  writeup. Expands IPS as **"International Patching System"**
-  (note: different from SNESTool's "International Patch Standard")
-  and dates the format loosely to "the early 1990s" with exact
+- [anosh.se/ips](https://www.anosh.se/ips/) — most detailed
+  community writeup, but a secondary synthesis source with
+  internal contradictions (see `upstream/anosh-source.md`).
+  Expands IPS as **"International Patching System"** (note:
+  different from SNESTool's "International Patch Standard") and
+  dates the format loosely to "the early 1990s" with exact
   origin "unknown"
 - [sneslab.net/wiki/IPS_file_format](https://sneslab.net/wiki/IPS_file_format)
-  — format spec focused writeup, no origin claims
+  — format-focused writeup, documents the truncation extension,
+  no origin claims
 
 The acronym expansion disagreement is real: SNESTool's 1996 doc
 says "International Patch Standard", anosh.se says "International
@@ -95,12 +119,24 @@ present at the format's creation, but I note both in the doc.
 ## Why IPS sticks around
 
 The format is severely limited — 16 MB max, no checksums, no
-reversibility, no metadata, no support for file growth or
-shrinkage — but it's also trivially easy to implement. A parser fits
-in twenty lines of any language. That simplicity plus its early
-arrival made it the default for SNES ROM hacks in the 90s, and the
-inertia has never fully dissipated even though BPS and UPS are
-strictly better in every way that matters.
+reversibility, no metadata, can only overwrite bytes at given
+offsets — but it's also trivially easy to implement. A parser
+fits in twenty lines of any language. That simplicity plus its
+early arrival made it the default for SNES ROM hacks in the 90s,
+and the inertia has never fully dissipated even though BPS and
+UPS are strictly better in every way that matters.
+
+Writing past the end of the source file grows the target
+implicitly (there is no mechanism to prevent it). A truncation
+extension exists (see `spec.md` for details and provenance) for
+shrinking the target. We have not specifically searched for
+real-world IPS patches that use truncation; none has turned up in
+our test corpus, but we haven't looked and IPS patches are
+abundant, so this tells us nothing. SNESTool's 1996 DOC describes
+"IPS 2" for cutting files (to "Kill them fucking advertisement
+Intro's"), so truncating patches almost certainly existed in the
+wild. ROM hacks, which make up the bulk of surviving IPS patches,
+almost universally add content.
 
 Modern SNES ROM hacks still frequently ship as IPS. Large game
 engines (GBA, N64) that can't fit within 16 MB have mostly moved
