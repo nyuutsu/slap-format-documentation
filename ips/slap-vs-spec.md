@@ -161,3 +161,28 @@ shouldn't happen. The collision is ~1 in 2,000 for large patches
 and only matters in the conversion path. But the structural
 cleanup (separating IPS baggage from `EncodingLimits`) is worth
 doing regardless of how often the sentinel fires.
+
+## Needs change: createIPS has no target-size guard
+
+`createIPS` is infallible:
+`SourceFileContents -> TargetFileContents -> PatchFileContents`.
+If you pass it files larger than the variant can address, it
+silently produces a corrupt patch. The optimizer
+(`scanDiffRegions` in `Optimize.hs:132`) walks the entire target
+with no offset bound. Records at offsets past 0xFFFFFF get
+truncated to 3 bytes by `encodeOffset Offset24`
+(`Create.hs:298-301`) — a record at 0x1200000 becomes 0x200000.
+Silent corruption.
+
+Flips has this guard explicitly:
+`if (targetlen > 16777216) return ips_16MB` (`libips.cpp:202`).
+slap has no equivalent.
+
+Fix: guard at the top of `createIPS`. If `max(sourceLen,
+targetLen)` exceeds the variant's addressable range, return an
+error. This means `createIPS` becomes fallible — `Either SlapError
+PatchFileContents` — which brings it in line with `createIPS32`
+and `createEBP` which already return `Either`.
+
+Same risk exists in principle for `createIPS32` with files > 4 GiB
+but is not realistic.
