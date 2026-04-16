@@ -14,8 +14,8 @@ later community writeups filling in the gaps.
 - **Offsets**: 3 bytes big-endian (max addressable byte: ~16 MB)
 - **Records**: either a plain "write these bytes at this offset"
   with a 2-byte big-endian length, or an RLE "write this byte N times"
-  where the length field is zero and two additional bytes give the
-  actual run length and fill byte
+  where the length field is zero and three additional bytes give the
+  run length (2 bytes) and fill byte (1 byte)
 - **No checksums**, no metadata, no file size field, no version field
 - **Not reversible**: records contain new data, not old
 
@@ -78,12 +78,10 @@ reconstruction.
 
 Caveats:
 - The claim doesn't establish a date. SNESTool 1.2 is from February
-  1996 (EXE timestamp; the DOC timestamp is January 1, 1996). IPS
-  support existed from the first SNESTool version — the v1.0-to-
-  v1.01 changelog already mentions IPS bugs. The DOC also describes
-  a concept called "IPS 2" for cutting (truncating) files,
-  implying that standard IPS did not support shrinking. See
-  `spec.md` "Truncate extension" for details.
+  1996 but IPS support existed from the first version: the
+  v1.0→v1.01 changelog already mentions "IPS Creating fucked up on
+  big files" and fixes to "IPS 2 (cutting files)." The earliest
+  SNESTool version isn't documented in the archive we have.
 - "Invented" is ambiguous. It could mean "designed the format" or
   "wrote the first implementation." Formats that are "just a file
   structure" often get designed organically and attributed later.
