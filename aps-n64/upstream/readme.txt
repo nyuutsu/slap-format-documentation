@@ -1,0 +1,137 @@
+            úúúù--ÄÄÄÄÄÄÍÄ[     APS 1.2      ]ÄÄÍÍÍÄÄÄÄÄ---ùúúú
+                                   ÜÜÜÜ
+          ÛÛßßÛ   ÛßßÛ             Û  Û   ÛßßÛ
+          ÛÛ  ÛÜÜÜÛ  ÛÜÜÜÜÜÜÜÜÜÜÜÜÜÛ  ÛÜÜÜÛ  ÛÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ
+          ÛÛ  ÛÜ  Û  ÛÜÜÜÜ  Û  ÜÜ  Û  ÛÛ  Û  ÜÜ  ÛÜÜÜÜ  Û  ÜÜ  ÛÛ
+          ÛÛ  ÛÛ  Û  Û  ÜÛ  Û  ÛÛÛÛÛ  Û   Û  ÛÛ  Û  ÜÛ  Û  ÛÛ  ÛÛ
+          ÛßÜÜßßÜÜßÜÜßÜÜßßÜÜßÜÜßßßßßÜÜßÜÜßßÜÜßßÜÜßÜÜßßÜÜßÜÜßßÜÜßÛ
+          Û ÛÛ  ÛÛ ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  Û  ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ Û
+          Û ÛÛ  ÛÛ ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ ÛÛ  ÛÛ Û
+          Û ßßßßßß ßß ßßßßßß ßß ßßß ßß   Û ßßßßßß ßßßßßß ßßß ÛÛ Û
+          ßßßßßßßßßßßßßßßßßßßßßßßßßßßßßß ÛÛ ßßßßßßßßßßßßßßßß ÛÛ Û
+                                                        ßßßßßßß
+ÉÍ--ùúú    ú úúù--ÄÄ-ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ-ÄÄ--ùúú ú    úúù--ÄÍ»
+³                        http://www.blackbag.org                           ³
+ÈÍ--ùúú    ú úúù--ÄÄ-ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ-ÄÄ--ùúú ú    úúù--ÄÍ¼
+
+        APS      : Advanced Patching System Version 0.1
+	
+	Authors	 : Silo (silo@blackbag.org)
+		   Fractal (fractal@blackbag.org)	
+	
+ APS has been designed with several features as standard.
+
+	o No file limitations.
+		With the ever expanding file sizes that are appearing ips files
+                have problems with patching files that are greater than 16Mb.
+		APS does not have this problem and should facilitate patching of
+		files up to 2Gb.
+
+	o Target file verification.
+		APS will be capable of target verification. In the case of type 1
+		(N64 patching) the patch will contain the CRC, Territory code and 
+		Cart ID. This will allow the patching program to make sure that 
+		the file about to be patched is the intended target.
+
+	o Internal Descriptors.
+		A small text field allowing APS authors to describe precisely 
+		what the patch does.
+
+	o Future expansion through different patch types and encoding methods.
+	
+
+
+
+Detailed File Structure
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Standard Header
+~~~~~~~~~~~~~~~
+	BYTE 0-4        : Magic ("APS10")
+
+	BYTE 5          : Patch Type : -
+	                    0 for a Simple Patch
+	                    1 for a N64 Specific Patch
+                          This method allows future expansion for other definable patch types. 
+
+	BYTE 6          : Encoding Method
+                            0 for Simple Encoding (Similar to IPS & Defined Below)
+                          (Again allowing for future expansion)
+	
+	BYTE 7-56       : Description
+                          Space padded free text for patch information.
+
+Type 0 : Simple Patching Header
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	BYTE 57-61	: Size of destination image.
+
+
+Type 1 : N64 Header
+~~~~~~~~~~~~~~~~~~~
+Header specific information for a type 1 (N64 specific) patch.
+
+	BYTE 57         : Original image file format
+        	           0 = Doctor V64
+                	   1 = CD64/Z64/Wc/SP
+
+	BYTE 58-59      : CartID
+        	           This is the two bytes of Cart ID taken directly from
+                	   the original image. Stored in Motorola (human readable) 
+			   endian.
+
+	BYTE 60         : Country
+	                   The original image's country code.Stored in Motorola
+	                   (human readable) endian.
+
+	BYTE 61-68      : CRC
+        	           The original image's CRC taken directly out of the
+        	           original image. Stored in Motorola (human readable) 
+			   endian.
+	
+	BYTE 69-74      : Pad.
+        	           For future expansion.
+
+	BYTE 75-79 	: Size of destination image.
+
+
+
+
+The Patch Itself
+~~~~~~~~~~~~~~~~
+Encoding Method #0. (offset 0x6 within the standard header)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Format : xxxx,y,zzzz
+	
+	xxxx 	= 4 byte file offset.
+	
+	y	= Number of bytes that will be changed.
+
+	zzzz	= New data to be written ('y' number of bytes).
+
+If paramter 'y' is set to zero (0) then paramter 'z' will be a two (2)
+byte field. Byte zero (0) will be the data and byte one (1) will be the 
+number of repetitions.
+
+
+Examples
+~~~~~~~~
+
+Starting from File Offset 0x0015F9D0 replace 3 bytes with 01,02,03
+D0 F9 15 00 03 01 02 03
+
+Starting from File Offset 0x0015F9D0 replace 0x10 bytes with 0xFF
+D0 F9 15 00 00 FF 10
+
+****************************************************************************
+****************************************************************************
+
+           APS is dedicated to CZN :) - keep the faith guys.
+
+****************************************************************************
+****************************************************************************
+
+
+
+
+ 

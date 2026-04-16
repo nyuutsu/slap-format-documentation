@@ -1,0 +1,5 @@
+.DS_Store
+*.swp
+*~
+.#*
+ninja2/upstream/multipatch/
