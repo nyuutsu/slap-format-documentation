@@ -27,3 +27,34 @@ The format's math permits the full range; the ecosystem applies it fine;
 what we emit is compatible with every existing applier. Flips's
 conservative create-side refusal is a design choice, not a format rule.
 We see no reason to inherit it.
+
+### Growth
+
+IPS has no target-size field in the wire format. Records name offsets;
+nothing says whether those offsets have to be within source length. In
+practice they don't: a record at an offset past the source end implicitly
+extends the target to include that record's write region.
+
+**slap derives target size at apply time.** When the patch has no
+truncation marker, target size is `max(sourceSize, maxRecordEnd)` — the
+larger of the source length and the highest byte position any record
+touches. When a truncation marker is present, that marker's value is the
+target size (covered in the shrink/truncation entry).
+
+Bytes in the target that fall within `[0, sourceSize)` come from source
+by default. Bytes in the growth region `[sourceSize, maxRecordEnd)` that
+no record overwrites are zero-filled.
+
+Ecosystem — all three appliers in `tools/` behave this way:
+
+- **Flips** `memcpy`'s source then `memset`s the tail to zero
+  (`libips.cpp:115`).
+- **RomPatcher.js** allocates a new BinFile of the computed size
+  (default-zero) and copies source in
+  (`RomPatcher.format.ips.js:138-141`).
+- **lua-ips** extends with explicit `string.char(0)` fill.
+
+Not really a design decision, more a consequence of the format: no target
+size declared, records name arbitrary offsets, so target size falls out
+of the records themselves and any untouched growth region has no other
+defined value.
