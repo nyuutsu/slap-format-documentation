@@ -41,7 +41,8 @@ with-source path strips the sentinel from the shared
 `| otherwise = record` passthrough for the "source too short" case,
 safety of which depends on a comment-enforced invariant.
 
-The fix replaces all of this with one function:
+The fix replaces all of this with one function. Sketch, not the
+implementation to do — just here to get the idea across:
 
 ```haskell
 resolveSentinelCollisions
@@ -55,7 +56,8 @@ Both paths use it. With-source gets the shift-and-prepend fix;
 source-less gets a `Left` with a clear error. `sentinelOffset` comes
 out of `EncodingLimits` entirely — `narrowHunks` is no longer
 IPS-aware. The silent passthrough dies; the compiler enforces
-"source present implies fix; source absent implies error."
+"source present implies fix; source absent implies error." Exact name
+and shape are open.
 
 ## Warning infrastructure — 4 is a prerequisite for 5, 6, 7, and 11
 
