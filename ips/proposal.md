@@ -82,3 +82,30 @@ unambiguous.
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply in wire order.
 Flips has a commented-out `w_scrambled = true` at `libips.cpp:69-70` —
 the author considered warning on unsorted records but didn't ship it.
+
+### Overlap
+
+Two records can name write regions that share one or more bytes. The
+format doesn't forbid this. What the target ends up holding for an
+overlapping byte depends on which record wrote it most recently.
+
+**slap permits overlap. Later records in wire order clobber earlier
+ones** — a direct consequence of wire-order apply semantics (see
+record-order entry). This is the same behavior every applier in the
+ecosystem exhibits; nobody checks for overlap at apply time.
+
+Overlap is unusual in real-world patches — encoders typically emit
+disjoint regions — so slap emits a warning when it detects one. The
+warning is a hint that the patch is shaped oddly; the apply still
+succeeds.
+
+slap's own encoder never produces overlapping records. `scanDiffRegions`
+emits hunks over disjoint divergence zones, and `avoidSentinel`'s
+shift-and-prepend doesn't create overlap (it only shifts a record one
+byte earlier and prepends one byte of source, which never collides with
+a preceding record). Overlap would come from patches produced by other
+tools.
+
+Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping
+records in wire order with no warning. slap's warning is slightly novel
+in that respect.
