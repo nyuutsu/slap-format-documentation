@@ -242,3 +242,26 @@ community.
 - **Vanilla IPS tools reject EBP files.** They see trailing bytes
   that aren't a 3-byte truncation marker and error. EBP works only
   with EBP-aware tooling.
+
+### IPS32
+
+IPS32 is a sibling format with widened offsets. Magic is `IPS32`
+(5 bytes); trailer is `EEOF` (4 bytes). Record offsets are 4 bytes
+big-endian instead of 3. Size and RLE encoding are unchanged (still
+16-bit). Reference implementation: leoetlino/sips.
+
+**Our plan:**
+
+- **slap supports IPS32**: parse, apply, create.
+- **All the semantic rules from StandardIPS carry over** at the
+  wire-adjusted level: apply in wire order; overlap clobbers with a
+  warning; unsorted records warn; RLE count = 0 warns; the record
+  ceiling is the arithmetic sum of the widened offset cap
+  (`0xFFFFFFFF`) and the unchanged size cap (`0xFFFF`). Sentinel
+  collision applies at `0x45454F46` — same shift-and-prepend with
+  source, reject without.
+- **Nothing is accepted after `EEOF`.** No documented truncation
+  extension, no EBP analog. Anything trailing is an error (see
+  trailing-bytes entry).
+- **EBP + IPS32 is not a thing.** No ecosystem tool recognizes the
+  combination. slap rejects it on parse and never emits it.
