@@ -147,3 +147,25 @@ whether the user's source is actually an SMC ROM, whether copier-header
 conventions match, or whether the DOS environment can see the files.
 
 See `ips2-snestool-report.md` for the evidence trail.
+
+### Sentinel collision
+
+The three-byte value `0x454F46` encodes, as an offset, to the same ASCII
+bytes as the `EOF` trailer. A parser reading a record boundary can't
+distinguish them. IPS32 has the analog collision at `0x45454F46`.
+
+**Our plan:**
+
+- **With source**: shift-and-prepend. When a record would emit at the
+  sentinel, shift it back by one byte and prepend `source[offset-1]`.
+  Record no longer sentinel-shaped; overlap is a no-op.
+- **Without source** (direct format→IPS conversion, no ROM): reject.
+  Detection is cheap (exact-equality scan); repair isn't possible
+  without the neighbor byte. Reject-at-encode beats silent
+  partial-apply downstream.
+- **Parse**: no lookahead. A disambiguating parser is conceptually
+  possible but produces IPS only slap-class parsers can read,
+  defeating the point.
+
+**Precision**: the rejection is exact-equality. Not a range, not
+probabilistic. No false positives.
