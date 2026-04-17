@@ -19,12 +19,17 @@ with no IPS32 analogue. createIPS does not emit them for IPS32
 and parseIPS does not accept them for IPS32 — symmetric rejection.
 
 ### EBP trailing JSON
-slap accepts bytes after the StandardIPS "EOF" trailer only when
-they match the recognized EBP metadata shape (JSON object with the
-discriminator field). Bytes that are neither a spec-conformant
-Flips truncation marker nor conformant EBP metadata are SlapError.
-createIPS's EBP path does not emit non-conformant trailing-JSON
-shapes.
+slap's EBP trailer check is shape-only: bytes after the StandardIPS
+"EOF" trailer are accepted as EBP metadata when they begin with `{`,
+and captured verbatim without JSON parsing or schema validation.
+Slap.IPS.Describe's field extractor pulls title/author/description
+leniently if they're present (case-insensitive, missing-field
+tolerant) but requires none of them. Trailing bytes that are neither
+a spec-conformant Flips truncation marker nor `{`-prefixed are
+SlapError. createIPS's EBP path writes the metadata blob verbatim;
+the blobs buildEBPMetadataJSON produces carry exactly the four
+canonical fields (patcher, title, author, description), so no
+non-conformant shape escapes.
 
 ### Variant ceiling rejection
 slap rejects records at parse time whose end position exceeds the
