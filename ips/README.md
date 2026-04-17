@@ -29,11 +29,12 @@ For the full on-disk structure and the edge cases, see `spec.md`.
   Flips' `libips.cpp`.
 - `proposal.md` — slap's resolved design decisions: IPS32 truncation
   symmetry, EBP trailing-JSON shape-check, variant ceiling rejection,
-  initialFill vs. copy-on-gap performance note.
+  sentinel-collision handling, and an initialFill performance note.
 - `slap-vs-spec.md` — live discrepancy report between spec/proposal
   and what `src/Slap/IPS` actually does. The open-todo surface:
   currently tracks RLE-zero handling, createIPS truncation emission,
-  sentinel-avoidance plumbing, and the createIPS target-size guard.
+  sentinel-avoidance plumbing, the createIPS target-size guard, and
+  the still-desired IPSBody / IPSPatch split.
 - `ips-audit.md` — design-context archaeology from the rewrite. The
   "why the code is shaped the way it is" reference: wire format
   reconstructions with Flips line-refs, BPS/UPS practice notes that
