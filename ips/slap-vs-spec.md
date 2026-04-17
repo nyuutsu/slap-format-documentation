@@ -214,3 +214,18 @@ and `createEBP` which already return `Either`.
 
 Same risk exists in principle for `createIPS32` with files > 4 GiB
 but is not realistic.
+
+## Still desired: IPSBody / IPSPatch split
+
+BPS and UPS split their parse results into a "body" type (what the
+`Get` action returns — raw-decoded fields) and a "patch" type (the
+finalized shape with CRCs validated and records materialized to
+`Vector`). IPS has only `IPSPatch`; `parseRecordsAndCaptureTrailer`
+returns an ad-hoc `([IPSRecord], ByteString)` tuple and
+`buildResultPatch` finalizes.
+
+Introducing `IPSBody` as the intermediate (record list, trailing
+bytes, detected variant) and keeping `IPSPatch` as the finalized
+shape would match the BPS/UPS structural parallel. Slappy rather
+than load-bearing — nothing functional depends on it; it just makes
+IPS match the shape its sibling modules already have.

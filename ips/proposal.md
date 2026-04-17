@@ -42,6 +42,24 @@ starts at 0xFFFFFF and extends to 0x1000000, within the arithmetic
 ceiling. A naive "offset ≤ 0xFFFFFF" check would falsely reject
 fe6. Apply trusts this precondition and does not re-check.
 
+### Sentinel collision (0x454F46 / 0x45454F46)
+
+slap never produces an IPS file containing a record at the sentinel
+offset.
+
+With source (normal create, or conversion with source provided):
+avoidSentinel applies the Archiveteam wiki's shift-and-prepend fix
+— emit the record at `offset-1` with the preceding source byte
+prepended. Output has no collision.
+
+Without source (direct format→IPS conversion): reject iff any input
+record has offset exactly equal to the sentinel. The check is exact
+equality; every rejection is a patch that would actually break,
+every non-rejection is safe. No probabilistic hedging.
+
+See ips-audit.md §1.4 for the full reasoning, including why the
+lookahead-parser alternative is rejected.
+
 ## Performance notes
 
 Slap.IPS.Apply's current initialFill approach unconditionally

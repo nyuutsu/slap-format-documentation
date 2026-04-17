@@ -188,11 +188,11 @@ fine. The input record list names every offset we're about to
 emit, so one equality check per record answers the question with
 certainty.
 
-So the rule is precise: reject when any record offset equals the
-sentinel; otherwise proceed. No probabilistic hedging. Every
-rejection catches a patch that would actually break; every
-non-rejection is a patch that won't. No false positives, no false
-negatives.
+So slap's rule, explicitly: reject when any record offset equals
+the sentinel; otherwise proceed. This is a deliberate design call.
+No probabilistic hedging. Every rejection catches a patch that
+would actually break; every non-rejection is a patch that won't.
+No false positives, no false negatives.
 
 Rejection is the forced move because we can't repair without
 source, not because we're guessing. "Anal" only in the sense that a
@@ -259,6 +259,12 @@ cursor, target-size fit) and performs the write. Each layer has one
 job. BPS/UPS even split `parseBPSBody`/`parseUPSBody` as pure `Get`
 actions inside `runGet`, with the CRC framing done outside. IPS should
 adopt the same split even though it has no CRC.
+
+> **STILL DESIRED.** The IPS rewrite did not adopt this split —
+> `parseRecordsAndCaptureTrailer` returns an ad-hoc
+> `([IPSRecord], ByteString)` tuple and `buildResultPatch`
+> finalizes from it. Endorsed in later review as "cute symmetry
+> we want if we can have it." Tracked in `slap-vs-spec.md`.
 
 **Body type vs. parsed-patch type split.** `BPSBody`/`UPSBody` are what
 the `Get` action returns; `BPSPatch`/`UPSPatch` are what the parser
@@ -896,10 +902,10 @@ I'll want answers before the writer is touched, and before apply's
 error taxonomy is finalized.
 
 **Q1. IPS32 truncation marker: keep or drop?**
-No authoritative source documents truncation for IPS32. slap currently
-emits and parses it (4 bytes, big-endian). sips.cpp does not emit one.
-Keep-with-warning, drop-entirely, or keep-silent are all defensible.
-Lean: drop the writer, keep the parser lenient with a warning.
+Drop both sides. No authoritative source documents truncation for
+IPS32, and we don't add slap-only extensions to a format we don't
+own. createIPS32 never emits a marker; parseIPS rejects any trailing
+bytes after EEOF as SlapError. Symmetric strictness.
 
 **Q2. EBP writer emitting truncation-then-JSON: drop?**
 Doesn't exist; not supported.
@@ -924,10 +930,13 @@ offset order) are unusual, so we tell the user. Same reasoning as
 Q4.
 
 **Q6. The `IPSContainer` sum shape.**
-Is the union of (`Plain`, `IPS32`, `EBP ByteString`) the right
-decomposition? Alternative: `(IPSOffsetWidth, Maybe EBPMeta)` — but
-that lets `(OffsetWidth32, Just meta)` through. Or: phantom variant
-type on `IPSPatch v`. The first one is simplest and newtype-maximalist.
+Resolved via a fourth option not sketched here: `EBPPatch` is a
+wrapper type holding an `IPSPatch` plus `EBPMetadata`. Plain and
+IPS32 patches are `IPSPatch` values directly; EBP is `EBPPatch
+{ ebpBasePatch = IPSPatch { ipsVariant = StandardIPS }, ebpMetadata
+= ... }`. Same end state as the `IPSContainer` sum — the nonsense
+combination (IPS32 + EBP metadata) is unrepresentable — via a
+different type shape.
 
 **Q7. Record type — one sum with two constructors, or
 `IPSRecord { offset, payload } | IPSRecordRLE { offset, count,
