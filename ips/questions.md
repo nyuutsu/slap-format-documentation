@@ -115,7 +115,10 @@ in that respect.
 IPS records write bytes; they can't remove them. Target size is either
 declared explicitly by the truncation marker — three big-endian bytes
 after `EOF` — or derived as `max(sourceSize, maxRecordEnd)` when no
-marker is present. Shrinking the target requires the marker.
+marker is present. The marker declares the final size absolutely: a
+value greater than `maxRecordEnd` grows the target (zero-filling the
+gap); a value less than `sourceSize` shrinks it. Shrinking specifically
+requires the marker; growing doesn't — records can grow on their own.
 
 **slap emits the marker when creating a patch with `target < source`,
 and accepts it on parse.** Same as Flips, same as RomPatcher.js.
@@ -169,3 +172,25 @@ distinguish them. IPS32 has the analog collision at `0x45454F46`.
 
 **Precision**: the rejection is exact-equality. Not a range, not
 probabilistic. No false positives.
+
+### Trailing bytes after `EOF`
+
+Four shapes are possible after the `EOF` trailer: nothing, a 3-byte
+truncation marker, an EBP metadata JSON blob, or something else.
+
+**Our plan:**
+
+- **Nothing**: vanilla IPS, no further action.
+- **Exactly 3 bytes**: Flips-style truncation marker. See truncation
+  entry.
+- **Starts with `{`**: EBP metadata. See EBP entry.
+- **Anything else**: error. Silent-ignore would mask corrupted files,
+  version mismatches, and patches produced by tools slap doesn't
+  recognize. Refusing gives the user a sharper signal.
+
+The three legitimate shapes don't overlap, so dispatch is unambiguous.
+
+IPS32's trailer is `EEOF`, not `EOF`. The same dispatch logic applies,
+but IPS32 has no documented truncation extension and no EBP analog —
+only the "nothing" bucket is legal. Any non-empty trailer after `EEOF`
+is an error.
