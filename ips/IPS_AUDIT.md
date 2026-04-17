@@ -121,15 +121,27 @@ Canonical JSON fields per the reference:
 
 The reference impl emits exactly these four keys. `patcher` is the
 discriminator — EBPatcher rejects patches whose `patcher` field isn't
-`"EBPatcher"`. slap already accepts any JSON and extracts
-title/author/description case-insensitively, which is lenient but fine.
+`"EBPatcher"`.
 
-Truncation-marker-then-JSON ordering: **not in the reference impl.**
-slap currently writes truncation-then-JSON in `encodeEBP`, and
-`parseIPS` tries truncation first and JSON-only as fallback. The
-writing side is a slap-only extension. **Judgment call to flag:** keep
-parse-side leniency (costs nothing), but the writer should probably not
-emit truncation inside EBP — it's a shape no other tool produces.
+slap's EBP JSON detection is deliberately crude. It checks two
+things: "does the trailer begin with `{`" (shape-gated entry), and
+— in Describe — "if any of the four known fields (`patcher`,
+`title`, `author`, `description`) are present, what's in them?"
+That is the entire machinery.
+
+Going further gets into "an entire JSON parser" territory. The EBP
+spec, read literally, permits any Unicode encoding for the metadata
+blob — which is absurd, but spec-compliant — and the original
+author probably didn't realize the implication. In practice every
+EBP patch we've seen uses the JSON blob to store four strings in
+UTF-8 and nothing else. Building a robust parser to handle the
+insane-spec case correctly is end-of-project polish at best; not a
+near-term task and possibly never.
+
+On "truncation-marker-then-JSON" inside an EBP trailer: no canonical
+EBP tool emits that shape. slap doesn't either. We apply a spec and
+we do it correctly — "topologically two lines would let us emit X"
+is irrelevant.
 
 ### 1.4 EOF sentinel collision (0x454F46 / 0x45454F46)
 
@@ -161,9 +173,49 @@ On the parse side, Flips loops `while (offset != 0x454F46)` — an
 unconditional hard stop with no lookahead (`libips.cpp:53`, verified
 locally). A record at this offset is unparseable in Flips.
 
-This assumes the encoder has the source bytes to look up. Without a
-source (direct IPS→IPS conversion with no ROM), the sentinel is
-genuinely unresolvable and the encoder must reject.
+The shift-and-prepend fix needs `source[offset-1]`. With source
+(normal create, source-attached conversion), `avoidSentinel` reads
+that byte and substitutes, and the issue is invisible downstream.
+Without source (direct format→IPS conversion with no ROM), there's
+no byte to prepend, so the fix is impossible.
+
+What's still possible without source is *detection*, and it's
+exact. The collision happens iff some record has offset equal to
+`0x454F46` — no more, no less. The ambiguity lives only in the
+offset field at a record boundary, not in payload bytes; records
+that write *through* the sentinel byte but start elsewhere are
+fine. The input record list names every offset we're about to
+emit, so one equality check per record answers the question with
+certainty.
+
+So the rule is precise: reject when any record offset equals the
+sentinel; otherwise proceed. No probabilistic hedging. Every
+rejection catches a patch that would actually break; every
+non-rejection is a patch that won't. No false positives, no false
+negatives.
+
+Rejection is the forced move because we can't repair without
+source, not because we're guessing. "Anal" only in the sense that a
+sufficiently careful parser could lookahead past a sentinel-shaped
+offset field and disambiguate from what follows — and we could rely
+on that, in principle. No IPS parser we've examined does this, slap
+included. slap's own parser peeks the next 3 bytes at each record
+boundary; when they equal `45 4F 46` it treats them as the trailer
+and stops, exactly like Flips's `while (offset != 0x454F46)`.
+Neither does lookahead-through-the-offset-into-the-size-field to
+disambiguate.
+
+Failure modes across the ecosystem for a record at the sentinel:
+strict parsers (slap, Flips) error on re-parse; permissive tools
+silently stop at the false EOF and apply only the records before
+it, producing a partially-patched ROM with no error surfaced. The
+second mode is the one that motivates rejection-at-encode — a
+clean upfront error is much kinder to the user than silent partial
+application hours later. A conceptually-smarter lookahead parser
+could resolve most cases unambiguously, but it leaves a residual
+class of genuinely-ambiguous inputs and produces output that only
+the smarter parser can read. Slap-only IPS patches defeat the
+point of emitting IPS in the first place.
 
 IPS32 analog: `"EEOF"` = `0x45454F46`. slap's `avoidSentinel` already
 generalizes over both widths via `ipsSentinel` / `ips32Sentinel` in
@@ -451,24 +503,20 @@ equivalent are in §5.
   `Either SlapError IPSRecord`, or refine at parse time only. BPS/UPS
   don't have this problem because their cursor is driven by deltas,
   not absolute offsets.
-- **PARTIALLY ADDRESSED** — the literal `Bool` was deleted by commit
-  `9d2171b` (*IPS.Types rewrite*, which notes "IPSPatch ... no longer
-  carries `ipsCleanEOF`"), and the missing-trailer state was
-  reconstructed by `2f23350` (*SomePatch: graceful fallback for
-  truncated IPS bodies*) via a pattern-match on `ParseError LabelIPS`
-  inside `parseSome` that synthesises a 0-record `IPSPatch` fallback
-  and attaches a `NoEOFMarker` warning. The `Bool` is gone; the state
-  it named is not gone, just displaced into `SomePatch.hs:277-291`.
+- **PARTIALLY ADDRESSED.** Commit `9d2171b` removed the
+  `ipsCleanEOF :: Bool` field. The audit's proposal — that the
+  "trailer was / wasn't there" state belongs in the type system as a
+  named variant, not a Bool — still stands. It was not carried
+  through during the rewrite. Instead, `2f23350` (*SomePatch:
+  graceful fallback for truncated IPS bodies*) reconstructed the
+  missing-trailer handling at the SomePatch layer by pattern-matching
+  on `ParseError LabelIPS` and synthesizing a 0-record `IPSPatch`
+  fallback with a `NoEOFMarker` warning.
 
-  The audit's deeper point — that "trailer was / wasn't there" is a
-  real two-case design state and deserves a named variant — has **not**
-  been resolved. Earlier review discussion in this conversation
-  floated a parse-result sum along the lines of
-  `data IPSParseResult = ParsedIPS IPSPatch | ParsedEBP EBPPatch |
-  ParsedTruncated (Vector IPSRecord)` to replace the SomePatch-level
-  reconstruction and make the three real post-parse shapes visible at
-  the type level. That reshape has not been done; it is still a live
-  todo. Original diagnosis retained below.
+  The typeful reshape is still the direction we're drawn to —
+  newtype-maximalism, making the domain state visible at the type
+  level. It will likely get done later. Original diagnosis retained
+  below.
   <!--
   `ipsCleanEOF :: Bool` — a two-state flag that's true when a proper
   trailer was found. The parser currently uses it to emit a
@@ -668,8 +716,17 @@ These are in the existing module and should survive the rewrite:
 
 - **Magic discrimination:** check `PATCH` → StandardIPS, else `IPS32` →
   IPS32, else BadMagic. Simple and correct. No ambiguity.
-- **RLE-count-zero rejection at parse time** (`Parse.hs:72-74`). Per
+- **RECONSIDERED: RLE-count-zero rejection.** The original audit
+  lean was "keep rejection" (matching Flips). We later changed our
+  minds — a zero-length RLE is a no-op, not corruption — and
+  `slap-vs-spec.md` records the current plan as "accept and warn."
+  Confidence is low; we may tighten back to rejection later.
+  Original lean:
+  <!--
+  **RLE-count-zero rejection at parse time** (`Parse.hs:72-74`). Per
   spec, `rle_size` must be non-zero.
+  -->
+
 - **Big-endian sentinel constants in `Slap.Measure`:**
   ```haskell
     ipsSentinel   :: Word32   -- 0x454F46
@@ -845,9 +902,7 @@ Keep-with-warning, drop-entirely, or keep-silent are all defensible.
 Lean: drop the writer, keep the parser lenient with a warning.
 
 **Q2. EBP writer emitting truncation-then-JSON: drop?**
-Nothing else does this. slap parses it as a fallback but also emits it.
-Lean: stop emitting truncation-in-EBP. Do nothing special on parse (the
-fallback already exists).
+Doesn't exist; not supported.
 
 **Q3. Parse-time or apply-time bounds check on record offsets?**
 Option B from §5 — parse rejects records whose `offset + payload`
@@ -859,15 +914,14 @@ Check whether any real-world fixture actually lives at the top of
 the offset range before committing.
 
 **Q4. Overlapping records — detect, reject, or tolerate silently?**
-Flips-produced IPS patches in the wild contain overlapping records
-(some encoders don't merge). Today slap applies them in order, later
-wins. Should that be a warning? An error? Left silent?
-Lean: silent on apply, warn on `slap info`.
+Warn. Records apply in wire order; later writes clobber earlier
+ones. Overlap is unusual, so we tell the user. Warnings are used
+liberally in slap.
 
 **Q5. Unsorted records — detect, reject, or tolerate silently?**
-Same question, orthogonal axis. Today slap applies in list order (not
-offset order) — the result depends on the order the encoder emitted.
-Real-world patches are usually sorted. Lean: silent.
+Warn. Records apply in wire order; unsorted records (wire order ≠
+offset order) are unusual, so we tell the user. Same reasoning as
+Q4.
 
 **Q6. The `IPSContainer` sum shape.**
 Is the union of (`Plain`, `IPS32`, `EBP ByteString`) the right
