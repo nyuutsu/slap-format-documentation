@@ -58,3 +58,27 @@ Not really a design decision, more a consequence of the format: no target
 size declared, records name arbitrary offsets, so target size falls out
 of the records themselves and any untouched growth region has no other
 defined value.
+
+### Record order
+
+Records appear in a patch in whatever order the encoder emitted them. The
+format doesn't require that order to match offset order; most encoders
+emit in offset order, but it's not a wire-level rule.
+
+**slap applies records in wire order, period.** The apply loop visits
+`records[0]`, `records[1]`, etc., in index order. No sorting, no
+reordering.
+
+If a patch's records aren't in offset order — call them unsorted — slap
+emits a warning. Unsorted records are unusual and we want to tell the
+user.
+
+Why wire order: reordering at apply time would change behavior when
+records overlap (see overlap entry — the clobber semantics depend on
+apply order). Any other choice introduces ambiguity that has to be
+enforced by convention rather than by the wire itself. Wire order is
+unambiguous.
+
+Ecosystem: Flips, RomPatcher.js, and lua-ips all apply in wire order.
+Flips has a commented-out `w_scrambled = true` at `libips.cpp:69-70` —
+the author considered warning on unsorted records but didn't ship it.
