@@ -194,3 +194,19 @@ IPS32's trailer is `EEOF`, not `EOF`. The same dispatch logic applies,
 but IPS32 has no documented truncation extension and no EBP analog —
 only the "nothing" bucket is legal. Any non-empty trailer after `EEOF`
 is an error.
+
+### RLE count = 0
+
+An RLE record with a count of zero is "write this byte zero times" —
+a no-op. The format is silent on whether this is legal; ZeroSoft's
+terse spec says "Any nonzero value" for the count field, which reads
+as disallowing zero without saying so directly. Implementations split:
+Flips rejects; RomPatcher.js and lua-ips silently no-op.
+
+**Our plan**: accept on parse, warn, never emit. A zero-count RLE is
+unusual enough to flag — it's almost certainly either a bug in the
+encoder or adversarial input — but it isn't corruption and doesn't
+need to fail the whole patch.
+
+No slap encoder produces a zero-count RLE; the question only comes up
+when parsing patches from elsewhere.
