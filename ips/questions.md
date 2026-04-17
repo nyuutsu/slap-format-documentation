@@ -69,9 +69,9 @@ emit in offset order, but it's not a wire-level rule.
 `records[0]`, `records[1]`, etc., in index order. No sorting, no
 reordering.
 
-If a patch's records aren't in offset order — call them unsorted — slap
-emits a warning. Unsorted records are unusual and we want to tell the
-user.
+If a patch's records aren't in offset order — call them unsorted —
+slap's plan is to emit a warning. Unsorted records are unusual and we
+want to tell the user. (Not yet implemented; see todos.md item 7.)
 
 Why wire order: reordering at apply time would change behavior when
 records overlap (see overlap entry — the clobber semantics depend on
@@ -95,20 +95,16 @@ record-order entry). This is the same behavior every applier in the
 ecosystem exhibits; nobody checks for overlap at apply time.
 
 Overlap is unusual in real-world patches — encoders typically emit
-disjoint regions — so slap emits a warning when it detects one. The
+disjoint regions — so slap's plan is to warn when it detects one. The
 warning is a hint that the patch is shaped oddly; the apply still
-succeeds.
+succeeds. (Not yet implemented; see todos.md item 6.)
 
-slap's own encoder never produces overlapping records. `scanDiffRegions`
-emits hunks over disjoint divergence zones, and `avoidSentinel`'s
-shift-and-prepend doesn't create overlap (it only shifts a record one
-byte earlier and prepends one byte of source, which never collides with
-a preceding record). Overlap would come from patches produced by other
-tools.
+slap's own encoder never produces overlapping records by construction;
+any overlap the parser sees comes from patches produced by other tools.
 
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping
-records in wire order with no warning. slap's warning is slightly novel
-in that respect.
+records in wire order with no warning. slap's intended warning would
+be slightly novel in that respect.
 
 ### Truncation marker (shrink)
 
@@ -120,8 +116,10 @@ value greater than `maxRecordEnd` grows the target (zero-filling the
 gap); a value less than `sourceSize` shrinks it. Shrinking specifically
 requires the marker; growing doesn't — records can grow on their own.
 
-**slap emits the marker when creating a patch with `target < source`,
-and accepts it on parse.** Same as Flips, same as RomPatcher.js.
+**slap accepts the marker on parse.** On create, slap's plan is to
+emit the marker when `target < source`. Same semantics as Flips and
+RomPatcher.js. (Emit-on-shrink is not yet implemented; see todos.md
+item 2.)
 
 Historically the marker wasn't an extension to a pre-existing
 marker-less format. The earliest tooling we can examine — SNESTool
