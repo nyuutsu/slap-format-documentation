@@ -60,27 +60,44 @@ every non-rejection is safe. No probabilistic hedging.
 See ips-audit.md §1.4 for the full reasoning, including why the
 lookahead-parser alternative is rejected.
 
+### Record application order
+Records apply in wire order — the exact order they appear in the
+patch file, period. Overlap is permitted; later writes clobber
+earlier ones. Both overlap and unsorted records are unusual and
+warn. Warnings are used liberally in slap. (The warnings themselves
+are not yet emitted by Slap.IPS.Apply; tracked in slap-vs-spec.md.)
+
 ## Performance notes
 
-Slap.IPS.Apply's current initialFill approach unconditionally
-copies the source ByteString into the output buffer before the
-record walk runs, then overlays record writes. For patches that
-rewrite most of the target, this is near-optimal. For large-source
-/ small-patch cases (fe6 is an 8 MiB GBA ROM whose patch extends
-the target to just under 16 MiB; wire patch is ~610 KB), the
-record payloads sum to roughly the wire size, so initialFill
-writes ~15 MiB of source-passthrough and zero-fill that no record
-ever overlays.
+Slap.IPS.Apply uses initialFill: allocate a buffer of the declared
+or derived target size, copy the source bytes into it (bounded by
+min(sourceLen, targetLen)), zero-fill any tail past source, then
+walk the record vector in wire order and overlay each record's
+write on top. Records apply in the exact order they appear in the
+patch file; overlap causes later writes to clobber earlier ones;
+no reordering happens anywhere.
 
-The asymptotically-better approach is copy-on-gap: walk the sorted
-record stream, copy source passthrough in gaps between records,
-write records over the gaps they fill, copy final tail. Each output
-byte is written exactly once.
+This is mildly inefficient when the patch is small relative to the
+source. fe6 is the pattern: an 8 MiB GBA ROM whose patch extends
+the target to just under 16 MiB; wire patch is ~610 KB. initialFill
+writes the full ~16 MiB of source-plus-zero-fill, and the record
+walk then writes another ~610 KB on top — so every output byte a
+record will overlay gets written twice. Steady-state waste is
+roughly the total size of all record payloads (a few percent of
+total buffer writes for fe6-shaped inputs).
 
-Copy-on-gap needs to iterate records in offset order to walk gaps
-between them. slap stores records in wire order, so the sort would
-live inside Slap.IPS.Apply as a local view over the record vector —
-an implementation choice inside apply, not a parse-time commitment
-to sorted storage. The optimization is planned as a follow-up commit
-once test coverage exists to validate the copy-on-gap path against
-the reference initialFill path for the same inputs.
+There are no urgent or definite plans to change this. The current
+approach is safe (every buffer byte has a defined value before any
+record runs), reliable (behavior doesn't depend on record
+distribution), and easy to reason about (apply order is exactly
+wire order, period). A faster scheme carries real risk of
+introducing reordering subtleties for little gain on typical inputs.
+
+As an aside: if efficiency ever does become pressing, there is a
+path that would preserve wire-order semantics. Compute a coverage
+mask in a first pass — which output bytes are touched by at least
+one record — then copy source passthrough only into the uncovered
+regions, and apply records in wire order on top as before. The
+mask is O(targetSize) bits; the record application is unchanged.
+No sorting, no reordering, no change to clobber semantics. Listed
+here as documentation, not as a plan.

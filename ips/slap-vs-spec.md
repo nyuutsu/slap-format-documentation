@@ -25,7 +25,9 @@ from what the documentation implies it should do.
   truncation marker if present.
 - Apply: `unsafePerformIO` + `create` + `IORef` error channel
   (BPS/UPS strict-apply pattern).
-- Overlapping records: allowed, last-write-wins in wire order.
+- Apply order: wire order, period. Overlap permitted; later writes
+  clobber earlier ones. (Warnings for overlap and unsorted records
+  are part of the design but not yet emitted — see below.)
 
 ## Needs change: RLE zero-length
 
@@ -131,9 +133,10 @@ shifts colliding records back by one byte and prepends the
 preceding source byte. It's total
 (`[EncodedHunk] -> [EncodedHunk]`) — if it can't fix the
 collision (source too short), it silently passes through. Its
-contract (documented in the comment at Create.hs:316-330) says
-it's only called from the with-source path where the optimizer
-guarantees the source is large enough.
+docstring (Create.hs:316-330) names it the with-source fix-up
+and notes that the source-less path is expected to detect and
+reject separately. The silent-passthrough branch is meant to be
+unreachable, but nothing at the type level enforces that.
 
 ### What to fix
 
@@ -229,3 +232,24 @@ bytes, detected variant) and keeping `IPSPatch` as the finalized
 shape would match the BPS/UPS structural parallel. Slappy rather
 than load-bearing — nothing functional depends on it; it just makes
 IPS match the shape its sibling modules already have.
+
+## Needs change: warn on overlap and unsorted records
+
+Design: records apply in wire order, period. Overlap is permitted
+and later writes clobber earlier ones. Both overlap and
+unsorted-record conditions are unusual — apply still succeeds, but
+we want to tell the user. Warnings are used liberally in slap.
+
+Current code: `Slap.IPS.Apply` walks the record vector in wire
+order and applies each record; no overlap check, no sortedness
+check, no warning emitted. Same underlying constraint as the
+RLE-zero case — `parseIPS` has no warning channel in its return
+type, and apply doesn't currently produce warnings either.
+
+The detection logic itself is cheap: one linear pass over the
+record vector that tracks `(prevOffset, coveredIntervals)` and
+emits a warning when a record's offset ≤ the previous record's
+offset (unsorted) or when a record's range intersects any
+previously-applied range (overlap). The placement question — do
+the checks live in parse, in apply, or somewhere else — depends on
+where warnings eventually thread through.

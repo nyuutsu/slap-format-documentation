@@ -519,10 +519,9 @@ equivalent are in §5.
   on `ParseError LabelIPS` and synthesizing a 0-record `IPSPatch`
   fallback with a `NoEOFMarker` warning.
 
-  The typeful reshape is still the direction we're drawn to —
-  newtype-maximalism, making the domain state visible at the type
-  level. It will likely get done later. Original diagnosis retained
-  below.
+  The typeful reshape remains open. nyuu: "I'm drawn to this sort
+  of thing, so I'll probably want to do it later." Original
+  diagnosis retained below.
   <!--
   `ipsCleanEOF :: Bool` — a two-state flag that's true when a proper
   trailer was found. The parser currently uses it to emit a
