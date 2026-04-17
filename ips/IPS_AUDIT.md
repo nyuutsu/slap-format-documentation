@@ -359,6 +359,14 @@ equivalent are in §5.
 
 ### 4.1 Diagnosis, per concern
 
+> **ADDRESSED** by commit `18ad06b` (2026-04-11, *IPS.Apply:
+> from-scratch rewrite to BPS/UPS standards*). `applyIPS` is now
+> `SourceFileContents -> IPSPatch -> Either SlapError TargetFileContents`,
+> built on the `unsafePerformIO` + `create` + `IORef` pattern with
+> per-record bounds checks via `fitsWithin`. `applyIPSMemory` no
+> longer exists. Diagnosis retained below as design record of why.
+
+<!--
 **`Slap.IPS.Apply` is permissive where BPS/UPS are strict.**
 - `applyIPS :: IPSPatch -> FilePath -> IO Int` opens the target file
   read-write, seeks and writes each record in place, optionally calls
@@ -373,7 +381,18 @@ equivalent are in §5.
   failure here — it can only produce a nonsense target.
 - Both paths allow overlapping records, out-of-order records,
   records-past-source, and records-past-truncation silently.
+-->
 
+> **ADDRESSED** by commits `49f691d` (2026-04-11, *IPS.Parse:
+> from-scratch rewrite to BPS/UPS standards* — whose message
+> explicitly notes "Replaces the speculative trailing-bytes
+> handling") and `921d220` (which replaced the free-form trailer
+> `ParseError` strings with a structured `UnrecognizedTrailer`).
+> `buildResultPatch` now accepts only empty / exact-marker-length /
+> `{`-prefixed trailers for StandardIPS, and only empty for IPS32;
+> anything else is `UnrecognizedTrailer`. Diagnosis retained below.
+
+<!--
 **`Slap.IPS.Parse` has speculative trailing-bytes handling.**
 - Line 92–98: after `EOF`, if the next byte is `{` → EBP JSON. Else
   try to read 3 (or 4) bytes as a truncation marker, then check the
@@ -384,9 +403,18 @@ equivalent are in §5.
 - Trailing garbage becomes silent "truncation marker" with no warning.
   A `.ips` file with a few random bytes glued on will parse as
   `ipsTruncate = Just someNonsense`.
+-->
+
 
 **`Slap.IPS.Types` makes several illegal states representable.**
-- `IPSPatch` carries `ipsVariant :: IPSVariant` (`StandardIPS | IPS32`)
+- **ADDRESSED** by commit `9d2171b` (2026-04-11, *IPS.Types:
+  from-scratch rewrite to BPS/UPS standards*). `IPSPatch` no longer
+  carries `ipsEBPMeta`; EBP metadata lives on an `EBPPatch` wrapper
+  holding an `IPSPatch` plus an `EBPMetadata` newtype around
+  `ByteString`. The "IPS32 with EBP metadata" nonsense state is
+  unrepresentable. Original diagnosis retained below.
+  <!--
+  `IPSPatch` carries `ipsVariant :: IPSVariant` (`StandardIPS | IPS32`)
   AND `ipsEBPMeta :: Maybe ByteString`. The combination "IPS32 with
   EBP metadata" is representable but nonsense: EBP is defined only
   as an extension of standard IPS. `SomePatch.hs:261-264` pattern
@@ -401,12 +429,21 @@ equivalent are in §5.
   ```
   (or a GADT over variant) would make the nonsense state unrepresentable.
   This is exactly the newtype-maximalist feedback.
-- `IPSRecord` and `IPSRecordRLE` have distinct field accessors
+  -->
+- **ADDRESSED** by commits `9d2171b` (`IPSRecord` collapsed to a
+  single sum with a constructor-agnostic `ipsRecordOffset` accessor)
+  and `921d220` (*IPS: hoist `recordPayloadLength` to Types; structure
+  trailer error* — hoisted the length accessor alongside it).
+  Describe no longer needs a local `ipsOffset` helper. Original
+  diagnosis retained below.
+  <!--
+  `IPSRecord` and `IPSRecordRLE` have distinct field accessors
   (`ipsRecordOffset` vs `ipsRleOffset`), forcing `Describe.hs:77-78` to
   define its own `ipsOffset` helper. A single record sum with a
   shared `offset` field (either through a common prefix record or
   via pattern matching once in an `ipsRecordOffset :: IPSRecord ->
   Offset` function exported from `Types.hs`) removes the duplication.
+  -->
 - `ipsRecordOffset` is a raw `Offset` (derived from `Int`). A standard
   IPS record has offset in `0..0xFFFFFF` and payload size in
   `1..0xFFFF`; the type doesn't capture that. Options: variant-tagged
@@ -414,12 +451,40 @@ equivalent are in §5.
   `Either SlapError IPSRecord`, or refine at parse time only. BPS/UPS
   don't have this problem because their cursor is driven by deltas,
   not absolute offsets.
-- `ipsCleanEOF :: Bool` — a two-state flag that's true when a proper
+- **PARTIALLY ADDRESSED** — the literal `Bool` was deleted by commit
+  `9d2171b` (*IPS.Types rewrite*, which notes "IPSPatch ... no longer
+  carries `ipsCleanEOF`"), and the missing-trailer state was
+  reconstructed by `2f23350` (*SomePatch: graceful fallback for
+  truncated IPS bodies*) via a pattern-match on `ParseError LabelIPS`
+  inside `parseSome` that synthesises a 0-record `IPSPatch` fallback
+  and attaches a `NoEOFMarker` warning. The `Bool` is gone; the state
+  it named is not gone, just displaced into `SomePatch.hs:277-291`.
+
+  The audit's deeper point — that "trailer was / wasn't there" is a
+  real two-case design state and deserves a named variant — has **not**
+  been resolved. Earlier review discussion in this conversation
+  floated a parse-result sum along the lines of
+  `data IPSParseResult = ParsedIPS IPSPatch | ParsedEBP EBPPatch |
+  ParsedTruncated (Vector IPSRecord)` to replace the SomePatch-level
+  reconstruction and make the three real post-parse shapes visible at
+  the type level. That reshape has not been done; it is still a live
+  todo. Original diagnosis retained below.
+  <!--
+  `ipsCleanEOF :: Bool` — a two-state flag that's true when a proper
   trailer was found. The parser currently uses it to emit a
   `NoEOFMarker` warning at `SomePatch.hs:266`. `Bool` here is pretty
   clearly two values that both deserve names:
   `TrailerPresent | TrailerMissing`.
+  -->
 
+> **ADDRESSED** by commits `9d2171b` (introduced the `OffsetWidth =
+> Offset24 | Offset32` sum and `offsetWidthByteCount :: OffsetWidth
+> -> Length` alongside `IPSVariantSpec`) and `49f691d` (*IPS.Parse:
+> from-scratch rewrite* — commit message explicitly notes "bare-Int
+> width parameterisation"). The raw 3/4 integers never appear in
+> parser signatures. Diagnosis retained below.
+
+<!--
 **`parseRecords` is parameterized by `offsetWidth :: Int`.** Line 39:
 ```haskell
   parseRecords :: IPSVariant -> Int -> Word32 -> Get IPSPatch
@@ -431,7 +496,20 @@ should not be "magic integers 3 and 4 flow through function
 signatures." A sum type `IPSOffsetWidth = OffsetWidth24 | OffsetWidth32`
 with a `widthBytes :: IPSOffsetWidth -> Length` accessor removes the
 footgun.
+-->
 
+> **ADDRESSED** by commits `602eb9f` (*IPS.Create: from-scratch
+> rewrite; lift DP optimizer to IPS.Optimize*) and `cbad82c` (*Measure:
+> move splitHunks out of IPS.Create*). The eighteen-export surface is
+> gone: the DP optimizer now lives in `Slap.IPS.Optimize`, the
+> format-agnostic `splitHunks` moved to `Slap.Measure` next to the
+> `Hunk` type, and the four near-duplicate top-level encoders
+> collapsed into one parameterised `encodeIPSPatch` plus a thin
+> `encodeEBPPatch` wrapper. The proposed module split was carried
+> through with `IPS.Optimize` used in place of the proposed
+> `IPS.Create.Optimal`. Diagnosis retained below.
+
+<!--
 **`Slap.IPS.Create` is doing several jobs at once and under-exports
 seams.** From `src/Slap/IPS/Create.hs`:
 ```haskell
@@ -460,7 +538,21 @@ rewrite, these should split cleanly into:
 - `Slap.IPS.Create` — the two public creators (`createIPS`,
   `createIPS32`, `createEBP`) plus `splitHunks` for convert, with the DP
   engine living in `Slap.IPS.Create.Optimal` (new submodule).
+-->
 
+> **SUPERSEDED** — this analysis describes an export surface that no
+> longer exists. Commit `602eb9f` (*IPS.Create: from-scratch rewrite*)
+> collapsed the four near-duplicate top-level encoders (`encodeIPS`,
+> `encodeIPS32`, `encodeEBP`, `encodeEBPRaw`) into one parameterised
+> `encodeIPSPatch :: IPSVariant -> SourceFileContents -> [EncodedHunk]
+> -> Maybe FileSize -> PatchFileContents` plus a thin `encodeEBPPatch`
+> wrapper, exactly as suggested in the final sentence of this
+> subsection. The follow-up "could move splitHunks" note was acted on
+> by `cbad82c` (now in `Slap.Measure`). The zero-dead-exports finding
+> still holds for the current surface. Original analysis retained
+> below.
+
+<!--
 **Encoder dead-code / near-dead-code (fact, not suspicion).**
 
 `splitHunks` — pre-grepped usage:
@@ -503,15 +595,35 @@ imports `avoidSentinel` and `optimalIPSRecords`;
 State as fact: **there is no dead code in `Slap.IPS.Create`. The four
 encoder entry points are all live, and `splitHunks` is a cross-format
 utility consumed by Convert.**
+-->
 
+> **ADDRESSED** — the "Keep" recommendation was reconsidered. Commit
+> `06ce9e6` (*IPS.Describe: from-scratch rewrite to BPS/UPS standards*)
+> dropped the ad-hoc scanner from Describe, and `59538ac` (*Slap.JSON:
+> port jsonPairs/jsonFieldCI out of IPS.Describe*) gave the helpers a
+> format-neutral home so Convert can import them without reaching
+> into IPS internals. The parser is still tiny and aeson-free; it
+> just lives in the right module now. Diagnosis retained below.
+
+<!--
 **`Slap.IPS.Describe` has its own mini-JSON parser (`jsonPairs`,
 `jsonFieldCI`) that's used both by Describe and by `SomePatch.hs` to
 extract EBP metadata.** This is fine as-is — there's no aeson
 dependency, and the parser is tiny. Not worth touching in the rewrite
 unless we find an actual bug. Keep.
+-->
 
 ### 4.2 Apply.hs type signature — quoted
 
+> **ADDRESSED** by commit `18ad06b` (*IPS.Apply: from-scratch rewrite
+> to BPS/UPS standards*). The signature converged on
+> `applyIPS :: SourceFileContents -> IPSPatch -> Either SlapError
+> TargetFileContents`, and the file-handle round-trip tests were
+> migrated in commit `2ec253f` (*SomePatch: rewrite IPS dispatch for
+> new parse/apply API*). Quoted old signatures retained below as
+> design record of why this section existed.
+
+<!--
 Asked in the prompt whether the existing `IPS/Apply.hs` returns
 `Either SlapError ByteString` strictly. It does not.
 
@@ -548,6 +660,7 @@ The file-handle path currently used by the round-trip tests
 need a new helper that materializes the source, calls pure `applyIPS`,
 and writes the result back. That's a test-harness change, not a
 behavioral one.
+-->
 
 ### 4.3 Behaviors worth preserving
 
