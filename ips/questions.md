@@ -210,3 +210,35 @@ need to fail the whole patch.
 
 No slap encoder produces a zero-count RLE; the question only comes up
 when parsing patches from elsewhere.
+
+### EBP
+
+EBP is a sibling format that uses IPS records as its substrate. Same
+magic (`PATCH`), same trailer (`EOF`), plus a UTF-8 JSON metadata blob
+tacked on after the trailer. File extension is `.ebp`. Reference
+implementation: Lyrositor/EBPatcher, from the EarthBound translation
+community.
+
+**Our plan:**
+
+- **slap supports EBP.** On parse, detect by shape (trailer starts
+  with `{`); capture the JSON blob verbatim; extract the canonical
+  fields (`patcher`, `title`, `author`, `description`) leniently if
+  they're present.
+- **On create**, emit the four canonical fields with `"patcher":"slap"`.
+  No custom fields.
+- **No shrinking inside EBP.** The reference implementation has no
+  concept of truncation. If a truncation marker were emitted before
+  the JSON, EBPatcher and other EBP-aware tools would either ignore
+  it (best case) or misparse the first 3 bytes of the JSON as a
+  truncation value (worst case). We don't go there. An EBP patch
+  can grow or preserve target size; it can't shrink. Users needing
+  shrink use a StandardIPS patch with a truncation marker instead.
+- **Detection is shape-only, not schema-validating.** The JSON is
+  captured as opaque bytes. No actual JSON parser, no encoding
+  validation. The EBP spec allows any Unicode encoding for the blob,
+  which is absurd-but-true; building a parser to handle the absurd
+  case is end-of-project polish at best.
+- **Vanilla IPS tools reject EBP files.** They see trailing bytes
+  that aren't a 3-byte truncation marker and error. EBP works only
+  with EBP-aware tooling.
