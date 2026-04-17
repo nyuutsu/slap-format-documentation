@@ -23,12 +23,26 @@ For the full on-disk structure and the edge cases, see `spec.md`.
 
 ## Files
 
-- `spec.md` — our writeup of the format's on-disk structure,
-  compiled from multiple community sources since no authoritative
-  spec exists.
-- `proposal.md` — resolved design questions for slap's IPS
-  implementation.
-- `IPS_AUDIT.md` — detailed audit brief for the IPS module rewrite.
+- `spec.md` — canonical IPS wire format: records, trailer, truncation
+  extension, EOF ambiguity. Compiled from community sources (no
+  authoritative original spec exists) and cross-referenced against
+  Flips' `libips.cpp`.
+- `proposal.md` — slap's resolved design decisions: IPS32 truncation
+  symmetry, EBP trailing-JSON shape-check, variant ceiling rejection,
+  initialFill vs. copy-on-gap performance note.
+- `slap-vs-spec.md` — live discrepancy report between spec/proposal
+  and what `src/Slap/IPS` actually does. The open-todo surface:
+  currently tracks RLE-zero handling, createIPS truncation emission,
+  sentinel-avoidance plumbing, and the createIPS target-size guard.
+- `ips-audit.md` — design-context archaeology from the rewrite. The
+  "why the code is shaped the way it is" reference: wire format
+  reconstructions with Flips line-refs, BPS/UPS practice notes that
+  IPS inherited, target-size-derivation options considered, test
+  fixture inventory, open-question archive, source-confidence meta.
+  Items addressed during the rewrite are annotated inline with the
+  commits that resolved them.
+- `quality-checked-by.md` — append-only log of Claude review snapshots
+  at review time. Not a living doc; don't amend.
 - `upstream/snestl12.zip` — the archive as downloaded from
   [romhacking.net utility #18](https://www.romhacking.net/utilities/18).
   SNESTool v1.2 by "THE MCA" of ELITE, dated February 12, 1996.
