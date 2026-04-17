@@ -109,3 +109,41 @@ tools.
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping
 records in wire order with no warning. slap's warning is slightly novel
 in that respect.
+
+### Truncation marker (shrink)
+
+IPS records write bytes; they can't remove them. Target size is either
+declared explicitly by the truncation marker — three big-endian bytes
+after `EOF` — or derived as `max(sourceSize, maxRecordEnd)` when no
+marker is present. Shrinking the target requires the marker.
+
+**slap emits the marker when creating a patch with `target < source`,
+and accepts it on parse.** Same as Flips, same as RomPatcher.js.
+
+Historically the marker wasn't an extension to a pre-existing
+marker-less format. The earliest tooling we can examine — SNESTool
+(MCA/Elite, 1996, DOS) — treats patches with and without it as two
+distinct formats, "IPS" and "IPS 2." Later tooling collapsed the
+distinction into a single format with an optional trailer.
+
+What varies across implementations is the acceptance policy, not the
+wire format:
+
+- **Modern appliers** (Flips, RomPatcher.js) accept any 3-byte marker
+  and resize to its value.
+- **SNESTool** accepts the marker only when `(size & 0xFFF) == 0x200`
+  — the SMC-copier-header pattern any "2ᴺ KiB + 0x200" SNES ROM
+  exhibits. Otherwise it rejects with `No File Cut, IPS2 size error !`.
+
+**Future flag: `--require-smc-shaped-target-size`** (draft name). When
+set on create, slap refuses to emit a marker whose declared target size
+doesn't satisfy the SMC pattern, making the patch acceptable to
+SNESTool's parser. No-op for patches that don't need a marker. Not yet
+implemented.
+
+Scope of the flag: necessary but not sufficient for end-to-end success
+in SNESTool. slap can check the IPS-layer predicate. slap can't check
+whether the user's source is actually an SMC ROM, whether copier-header
+conventions match, or whether the DOS environment can see the files.
+
+See `ips2-snestool-report.md` for the evidence trail.
