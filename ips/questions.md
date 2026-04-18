@@ -100,7 +100,7 @@ Four shapes are possible after the `EOF` trailer: nothing, a 3-byte truncation m
 
 The three legitimate shapes don't overlap, so dispatch is unambiguous.
 
-IPS32's trailer is `EEOF`, not `EOF`. The same dispatch logic applies, but IPS32 has no documented truncation extension and no EBP analog — only the "nothing" bucket is legal. Any non-empty trailer after `EEOF` is an error.
+IPS32's trailer is `EEOF`, not `EOF`. IPS32 has no documented truncation extension and no EBP analog — trailing bytes after `EEOF` have no defined meaning. Atmosphère (the canonical applier) silently ignores them, so patches in the wild may carry arbitrary junk there without breaking on-console. slap accepts trailing bytes with a warning and discards them on parse; they aren't round-tripped on re-emit.
 
 ### RLE count = 0
 
@@ -124,11 +124,13 @@ EBP is a sibling format that uses IPS records as its substrate. Same magic (`PAT
 
 ### IPS32
 
-IPS32 is a sibling format with widened offsets. Magic is `IPS32` (5 bytes); trailer is `EEOF` (4 bytes). Record offsets are 4 bytes big-endian instead of 3. Size and RLE encoding are unchanged (still 16-bit). Reference implementation: leoetlino/sips.
+IPS32 is a sibling format with widened offsets. Magic is `IPS32` (5 bytes); trailer is `EEOF` (4 bytes). Record offsets are 4 bytes big-endian instead of 3. Size and RLE encoding are unchanged (still 16-bit). Reference implementations: leoetlino/sips for create; Atmosphère's `libstratosphere` for apply.
 
 **Our plan:**
 
 - **slap supports IPS32**: parse, apply, create.
 - **All the semantic rules from StandardIPS carry over** at the wire-adjusted level: apply in wire order; overlap clobbers (with the same not-yet-implemented warning as StandardIPS); unsorted records warn (likewise not yet implemented); RLE count = 0 warns (likewise); the record ceiling is the arithmetic sum of the widened offset cap (`0xFFFFFFFF`) and the unchanged size cap (`0xFFFF`). Sentinel collision applies at `0x45454F46` — same shift-and-prepend with source, reject without.
-- **Nothing is accepted after `EEOF`.** No documented truncation extension, no EBP analog. Anything trailing is an error (see trailing-bytes entry).
+- **Trailing bytes after `EEOF`** have no defined meaning. slap accepts them with a warning and drops them on parse; Atmosphère, the canonical applier, silently ignores them.
 - **EBP + IPS32 is not a thing.** No ecosystem tool recognizes the combination. slap rejects it on parse and never emits it.
+
+In practice IPS32 is applied by Atmosphère against mapped Switch modules, so the applier does things slap doesn't — clipping writes past the module's mapped size, skipping writes into protected regions. slap is a file tool; these divergences are real but out of its scope.

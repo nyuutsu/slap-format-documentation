@@ -67,3 +67,7 @@ Optional create-time flag that refuses to emit a truncation marker whose declare
 The "did we see a trailer, and what kind?" state exists in the program but isn't named at the type level — it's reconstructed in `SomePatch` via pattern-matching on `ParseError LabelIPS` and synthesizing a fake `IPSPatch`. Replace the reconstruction with a named parse-result sum that makes the trailer-state a typed variant.
 
 **This item is less certain than the others.** The direction is clear — make the three real post-parse shapes (clean IPS, clean EBP, trailer-missing) visible at the type level instead of distinguishing them via error-channel pattern-matches. The specific constructor shape is open. Something along the lines of `ParsedIPS IPSPatch | ParsedEBP EBPPatch | ParsedTruncated (Vector IPSRecord)` is a plausible sketch but hasn't been ratified. Listed here because the direction is committed-to, not because the exact shape is.
+
+### 12. Tolerate trailing bytes after IPS32 `EEOF`
+
+questions.md IPS32 entry says slap accepts trailing bytes after `EEOF` with a warning and drops them on parse. Current code rejects such files with `UnrecognizedTrailer`; change it to accept. Depends on item 4 for the warning channel.
