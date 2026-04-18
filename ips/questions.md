@@ -65,8 +65,7 @@ Records appear in a patch in whatever order the encoder emitted them. The
 format doesn't require that order to match offset order; most encoders
 emit in offset order, but it's not a wire-level rule.
 
-**slap applies records in wire order, period.** The apply loop visits
-`records[0]`, `records[1]`, etc., in index order. No sorting, no
+**slap applies records in wire order, period.** No sorting, no
 reordering.
 
 If a patch's records aren't in offset order — call them unsorted —
@@ -99,8 +98,8 @@ disjoint regions — so slap's plan is to warn when it detects one. The
 warning is a hint that the patch is shaped oddly; the apply still
 succeeds. (Not yet implemented; see todos.md item 6.)
 
-slap's own encoder never produces overlapping records by construction;
-any overlap the parser sees comes from patches produced by other tools.
+slap never emits overlapping records; any overlap the parser sees
+comes from patches produced by other tools.
 
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping
 records in wire order with no warning. slap's intended warning would
@@ -206,8 +205,8 @@ unusual enough to flag — it's almost certainly either a bug in the
 encoder or adversarial input — but it isn't corruption and doesn't
 need to fail the whole patch.
 
-No slap encoder produces a zero-count RLE; the question only comes up
-when parsing patches from elsewhere.
+slap never emits a zero-count RLE; the question only comes up when
+parsing patches from elsewhere.
 
 ### EBP
 

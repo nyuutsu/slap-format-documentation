@@ -121,10 +121,10 @@ no-op; purely an aesthetic / parallel-structure improvement.
 
 Optional create-time flag that refuses to emit a truncation marker
 whose declared target size doesn't satisfy `(size & 0xFFF) ==
-0x200`, making the emitted patch acceptable to SNESTool's parser on
-period tooling. No-op for patches that don't need a marker (target
-≥ source). See questions.md truncation entry for the scope caveat
-(necessary but not sufficient for end-to-end SNESTool success).
+0x200`, making the emitted patch acceptable to SNESTool's parser.
+No-op for patches that don't need a marker (target ≥ source). See
+questions.md truncation entry for the scope caveat (necessary but
+not sufficient for end-to-end SNESTool success).
 
 ### 10. Typeful reshape of trailer-state
 
