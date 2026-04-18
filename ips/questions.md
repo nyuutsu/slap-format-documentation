@@ -24,9 +24,9 @@ with payload extending past `0x1000000`. Flips and RomPatcher.js both
 apply it cleanly despite neither being able to produce it.
 
 The format's math permits the full range; the ecosystem applies it fine;
-what we emit is compatible with every existing applier. Flips's
+what slap emits is compatible with every existing applier. Flips's
 conservative create-side refusal is a design choice, not a format rule.
-We see no reason to inherit it.
+slap doesn't inherit it.
 
 ### Growth
 
@@ -228,9 +228,10 @@ community.
   concept of truncation. If a truncation marker were emitted before
   the JSON, EBPatcher and other EBP-aware tools would either ignore
   it (best case) or misparse the first 3 bytes of the JSON as a
-  truncation value (worst case). We don't go there. An EBP patch
-  can grow or preserve target size; it can't shrink. Users needing
-  shrink use a StandardIPS patch with a truncation marker instead.
+  truncation value (worst case). slap doesn't go there. An EBP
+  patch can grow or preserve target size; it can't shrink. Users
+  needing shrink use a StandardIPS patch with a truncation marker
+  instead.
 - **Detection is shape-only, not schema-validating.** The JSON is
   captured as opaque bytes. No actual JSON parser, no encoding
   validation. The EBP spec allows any Unicode encoding for the blob,
