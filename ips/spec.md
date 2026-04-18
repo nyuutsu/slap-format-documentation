@@ -131,5 +131,5 @@ The wire layout above is the spec. Everything else — how to handle a
 record whose offset encodes to the trailer bytes, whether a zero-count
 RLE record is valid, whether the target can be truncated after record
 application, whether overlapping records are permitted, in what order
-records apply — is either implementation convention or left open. slap's
-answers to those questions are documented separately.
+records apply — is either implementation convention or left open. Those
+questions are answered separately.
