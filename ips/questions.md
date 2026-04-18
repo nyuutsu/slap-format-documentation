@@ -251,12 +251,13 @@ big-endian instead of 3. Size and RLE encoding are unchanged (still
 
 - **slap supports IPS32**: parse, apply, create.
 - **All the semantic rules from StandardIPS carry over** at the
-  wire-adjusted level: apply in wire order; overlap clobbers with a
-  warning; unsorted records warn; RLE count = 0 warns; the record
-  ceiling is the arithmetic sum of the widened offset cap
-  (`0xFFFFFFFF`) and the unchanged size cap (`0xFFFF`). Sentinel
-  collision applies at `0x45454F46` — same shift-and-prepend with
-  source, reject without.
+  wire-adjusted level: apply in wire order; overlap clobbers (with
+  the same not-yet-implemented warning as StandardIPS); unsorted
+  records warn (likewise not yet implemented); RLE count = 0 warns
+  (likewise); the record ceiling is the arithmetic sum of the
+  widened offset cap (`0xFFFFFFFF`) and the unchanged size cap
+  (`0xFFFF`). Sentinel collision applies at `0x45454F46` — same
+  shift-and-prepend with source, reject without.
 - **Nothing is accepted after `EEOF`.** No documented truncation
   extension, no EBP analog. Anything trailing is an error (see
   trailing-bytes entry).
