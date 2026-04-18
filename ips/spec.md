@@ -123,7 +123,7 @@ offset `0x002000`:
   45 4F 46           "EOF"
 ```
 
-Total: 17 bytes on the wire.
+Total: 16 bytes on the wire.
 
 ## What the format doesn't specify
 
