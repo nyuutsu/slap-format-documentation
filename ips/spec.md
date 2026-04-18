@@ -12,8 +12,6 @@ An IPS patch consists of:
 2. Zero or more records.
 3. The three ASCII bytes `EOF`.
 
-None of these bytes are null-terminated.
-
 ```
 ┌─────────┬────────────────┬───────┐
 │  PATCH  │   records ...  │  EOF  │
@@ -89,7 +87,7 @@ bytes. Record size and RLE encoding are unchanged.
 ```
 
 **EBP.** Structurally IPS: a `PATCH` patch with an `EOF` trailer,
-followed by a UTF-8 JSON metadata blob.
+followed by a JSON metadata blob.
 
 ```
 ┌─────────┬────────────────┬───────┬────────────────────┐

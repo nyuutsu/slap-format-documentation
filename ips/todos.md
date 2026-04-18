@@ -117,7 +117,7 @@ BPS and UPS split their parse results into a "body" type
 finalized shape would match the structural parallel. Functional
 no-op; purely an aesthetic / parallel-structure improvement.
 
-### 9. `--require-smc-shaped-target-size` flag
+### 9. `--require-smc-shaped-target-size` flag (draft name)
 
 Optional create-time flag that refuses to emit a truncation marker
 whose declared target size doesn't satisfy `(size & 0xFFF) ==
