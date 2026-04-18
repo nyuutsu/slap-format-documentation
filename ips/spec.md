@@ -1,8 +1,6 @@
 # IPS — wire format
 
-An IPS patch is a sequence of records that write bytes at given offsets in
-a target file. The format carries no checksums, no metadata, no file-size
-field, and no source identification.
+An IPS patch is a sequence of records that write bytes at given offsets in a target file. The format carries no checksums, no metadata, no file-size field, and no source identification.
 
 ## Layout
 
@@ -21,8 +19,7 @@ An IPS patch consists of:
 
 ## Records
 
-Each record begins with a 3-byte big-endian offset and a 2-byte big-endian
-size. The body that follows depends on the size.
+Each record begins with a 3-byte big-endian offset and a 2-byte big-endian size. The body that follows depends on the size.
 
 ```
 ┌──────────┬────────┬──────────────┐
@@ -31,9 +28,7 @@ size. The body that follows depends on the size.
 └──────────┴────────┴──────────────┘
 ```
 
-If the size is nonzero, the record's payload is the next `size` bytes.
-Applying the record writes those bytes to the target starting at the given
-offset.
+If the size is nonzero, the record's payload is the next `size` bytes. Applying the record writes those bytes to the target starting at the given offset.
 
 ```
 ┌──────────┬────────┬────────────┐
@@ -42,10 +37,7 @@ offset.
 └──────────┴────────┴────────────┘
 ```
 
-If the size is zero, the record is run-length-encoded. The next 2 bytes
-are a big-endian run count, and the following byte is a fill value.
-Applying the record writes the fill byte, `count` times, to the target
-starting at the given offset.
+If the size is zero, the record is run-length-encoded. The next 2 bytes are a big-endian run count, and the following byte is a fill value. Applying the record writes the fill byte, `count` times, to the target starting at the given offset.
 
 ```
 ┌──────────┬───────┬─────────┬──────┐
@@ -54,8 +46,7 @@ starting at the given offset.
 └──────────┴───────┴─────────┴──────┘
 ```
 
-Offsets are 24 bits wide, big-endian. A hypothetical offset of `0x123456`
-encodes as three bytes on the wire:
+Offsets are 24 bits wide, big-endian. A hypothetical offset of `0x123456` encodes as three bytes on the wire:
 
 ```
 ┌──────┬──────┬──────┐
@@ -64,15 +55,11 @@ encodes as three bytes on the wire:
   high          low
 ```
 
-Sizes, RLE counts, and payload lengths are 16 bits wide, also big-endian.
-The maximum byte a single record can touch is therefore
-`0xFFFFFF + 0xFFFF - 1 = 0x100FFFD`.
+Sizes, RLE counts, and payload lengths are 16 bits wide, also big-endian. The maximum byte a single record can touch is therefore `0xFFFFFF + 0xFFFF - 1 = 0x100FFFD`.
 
 ## Variants
 
-**IPS32.** Magic becomes `IPS32` (five bytes). Trailer becomes `EEOF`
-(four bytes, `0x45 0x45 0x4F 0x46`). Record offsets widen from 3 to 4
-bytes. Record size and RLE encoding are unchanged.
+**IPS32.** Magic becomes `IPS32` (five bytes). Trailer becomes `EEOF` (four bytes, `0x45 0x45 0x4F 0x46`). Record offsets widen from 3 to 4 bytes. Record size and RLE encoding are unchanged.
 
 ```
 ┌─────────┬────────────────┬────────┐
@@ -86,8 +73,7 @@ bytes. Record size and RLE encoding are unchanged.
 └────────────┴────────┴──────────────┘
 ```
 
-**EBP.** Structurally IPS: a `PATCH` patch with an `EOF` trailer,
-followed by a JSON metadata blob.
+**EBP.** Structurally IPS: a `PATCH` patch with an `EOF` trailer, followed by a JSON metadata blob.
 
 ```
 ┌─────────┬────────────────┬───────┬────────────────────┐
@@ -98,8 +84,7 @@ followed by a JSON metadata blob.
 
 ## Example
 
-A minimal patch that writes the three bytes `0xAA 0xBB 0xCC` at offset
-`0x000100` of the target:
+A minimal patch that writes the three bytes `0xAA 0xBB 0xCC` at offset `0x000100` of the target:
 
 ```
   50 41 54 43 48     "PATCH"
@@ -111,8 +96,7 @@ A minimal patch that writes the three bytes `0xAA 0xBB 0xCC` at offset
 
 Total: 16 bytes on the wire.
 
-A minimal RLE patch that writes the byte `0xFF` fifty times starting at
-offset `0x002000`:
+A minimal RLE patch that writes the byte `0xFF` fifty times starting at offset `0x002000`:
 
 ```
   50 41 54 43 48     "PATCH"
@@ -127,9 +111,4 @@ Total: 16 bytes on the wire.
 
 ## What the format doesn't specify
 
-The wire layout above is the spec. Everything else — how to handle a
-record whose offset encodes to the trailer bytes, whether a zero-count
-RLE record is valid, whether the target can be truncated after record
-application, whether overlapping records are permitted, in what order
-records apply — is either implementation convention or left open. Those
-questions are answered separately.
+The wire layout above is the spec. Everything else — how to handle a record whose offset encodes to the trailer bytes, whether a zero-count RLE record is valid, whether the target can be truncated after record application, whether overlapping records are permitted, in what order records apply — is either implementation convention or left open. Those questions are answered separately.
