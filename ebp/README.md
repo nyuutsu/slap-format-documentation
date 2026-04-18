@@ -1,36 +1,17 @@
 # EBP
 
-IPS with a JSON metadata payload. Created by the EarthBound hacking
-community.
+EBP is an IPS variant — `PATCH` records then `EOF`, followed by a JSON metadata blob. See `../ips/` for the format proper and slap's handling of it. This folder collects EBP-specific findings that don't fit in the IPS docs.
 
-## Status in slap
+## JSON escape handling bug in `Slap.JSON`
 
-- **Parse**: reads IPS records + JSON metadata.
-- **Apply**: standard IPS apply.
-- **Create**: supported. `--title`, `--author`, `--description` flags.
-- **Info**: shows JSON metadata fields.
+`Slap.JSON.scanQuoted` handles `\"` and `\\` correctly but uses a catch-all for everything else that strips the backslash without interpreting the escape:
 
-## Known issues
+- `\n` becomes literal `n` (should be newline).
+- `\t` becomes literal `t` (should be tab).
+- `\r`, `\b`, `\f` have the same shape.
+- `\uXXXX` becomes `uXXXX` (should be the corresponding codepoint).
+- `\/` becomes `/`, which is accidentally correct.
 
-### JSON escape handling (Slap.JSON)
+In practice this affects `Mother2Deluxe_2.0.ebp`'s description, which contains `\n`. The bug is cosmetic (metadata display) — apply is unaffected.
 
-The JSON decoder in `Slap.JSON.scanQuoted` handles `\"` and `\\`
-but uses a catch-all for other backslash sequences that strips the
-backslash without interpreting the escape:
-
-- `\n` becomes literal `n` (should be newline)
-- `\t` becomes literal `t` (should be tab)
-- `\uXXXX` becomes `uXXXX` (should be Unicode codepoint)
-
-In practice this affects Mother2Deluxe's description which contains
-`\n`. The bug is cosmetic (metadata display) not structural (apply
-is unaffected).
-
-Fix: add named cases for `\n`, `\t`, `\r`, `\b`, `\f`, `\/` before
-the catch-all. Add `\uXXXX` handler for four-hex-digit Unicode
-escapes. Keep UTF-8-only assumption and flat-object scope as
-deliberate limitations.
-
-## Files
-
-- `spec.md` — format specification
+Fix: named cases for `\n`, `\t`, `\r`, `\b`, `\f`, `\/` between the `\\` case and the catch-all; a `\uXXXX` handler that reads four hex digits. Keep the UTF-8-only assumption and flat-object scope as deliberate limitations. The catch-all stays as a fallback for genuinely unrecognized escapes.
