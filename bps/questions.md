@@ -1,4 +1,4 @@
-# BPS — open questions
+# BPS — design questions
 
 Questions tagged **(uses-frostmourne-to-butter-its-toast)** mark places where the spec grants expressive power wildly beyond what convention actually uses. A compliant implementation would have to handle a possible-space radically larger than the practical-space. The archetype is EBP's trailing-JSON field: convention is a UTF-8 JSON object holding four specific strings, but EBP has no spec — the only actual rule is "it has a JSON at the end of it, therefore it is a valid EBP." The lack of rules creates the anarchy: a UTF-32-encoded JSON of any shape passes the same check, and a strictly-compliant parser has to accept it. These questions carry an extra dimension — not just "what do we do," but "how far do we chase the hypothetical."
 

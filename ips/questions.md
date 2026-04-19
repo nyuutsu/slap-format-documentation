@@ -1,6 +1,8 @@
 # IPS — design questions
 
-### Record ceiling
+Questions tagged **(uses-frostmourne-to-butter-its-toast)** mark places where the spec grants expressive power wildly beyond what convention actually uses. A compliant implementation would have to handle a possible-space radically larger than the practical-space. The archetype is EBP's trailing-JSON field: convention is a UTF-8 JSON object holding four specific strings, but EBP has no spec — the only actual rule is "it has a JSON at the end of it, therefore it is a valid EBP." The lack of rules creates the anarchy: a UTF-32-encoded JSON of any shape passes the same check, and a strictly-compliant parser has to accept it. These questions carry an extra dimension — not just "what do we do," but "how far do we chase the hypothetical."
+
+### What record-end positions does slap accept on parse and emit on create?
 
 The 24-bit offset and 16-bit size are independent field widths. Saturating both gives a last-byte position of `0xFFFFFF + 0xFFFF - 1 = 0x100FFFD` — about 64 KB past 16 MiB. The addressable range is `0x100FFFE` bytes.
 
@@ -16,7 +18,7 @@ Ecosystem:
 
 The format's math permits the full range; the ecosystem applies it fine; what slap emits is compatible with every existing applier. Flips's conservative create-side refusal is a design choice, not a format rule. slap doesn't inherit it.
 
-### Growth
+### How is target size determined when IPS has no target-size field?
 
 IPS has no target-size field in the wire format. Records name offsets; nothing says whether those offsets have to be within source length. In practice they don't: a record at an offset past the source end implicitly extends the target to include that record's write region.
 
@@ -32,7 +34,7 @@ Ecosystem — all three appliers in `tools/` behave this way:
 
 Not really a design decision, more a consequence of the format: no target size declared, records name arbitrary offsets, so target size falls out of the records themselves and any untouched growth region has no other defined value.
 
-### Record order
+### In what order does slap apply records, and what happens when they aren't offset-sorted?
 
 Records appear in a patch in whatever order the encoder emitted them. The format doesn't require that order to match offset order; most encoders emit in offset order, but it's not a wire-level rule.
 
@@ -44,7 +46,7 @@ Why wire order: reordering at apply time would change behavior when records over
 
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply in wire order. Flips has a commented-out `w_scrambled = true` at `libips.cpp:69-70` — the author considered warning on unsorted records but didn't ship it.
 
-### Overlap
+### What does slap do when records write to overlapping regions?
 
 Two records can name write regions that share one or more bytes. The format doesn't forbid this. What the target ends up holding for an overlapping byte depends on which record wrote it most recently.
 
@@ -56,7 +58,7 @@ slap never emits overlapping records; any overlap the parser sees comes from pat
 
 Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping records in wire order with no warning. slap's intended warning would be slightly novel in that respect.
 
-### Truncation marker (shrink)
+### How does slap handle the post-EOF truncation marker, and when does it emit one?
 
 IPS records write bytes; they can't remove them. Target size is either declared explicitly by the truncation marker — three big-endian bytes after `EOF` — or derived as `max(sourceSize, maxRecordEnd)` when no marker is present. The marker declares the final size absolutely: a value greater than `maxRecordEnd` grows the target (zero-filling the gap); a value less than `sourceSize` shrinks it. Shrinking specifically requires the marker; growing doesn't — records can grow on their own.
 
@@ -75,7 +77,7 @@ Scope of the flag: necessary but not sufficient for end-to-end success in SNESTo
 
 See `ips2-snestool-report.md` for the evidence trail.
 
-### Sentinel collision
+### What does slap do when a record's offset encodes as the EOF/EEOF sentinel?
 
 The three-byte value `0x454F46` encodes, as an offset, to the same ASCII bytes as the `EOF` trailer. A parser reading a record boundary can't distinguish them. IPS32 has the analog collision at `0x45454F46`.
 
@@ -87,7 +89,7 @@ The three-byte value `0x454F46` encodes, as an offset, to the same ASCII bytes a
 
 **Precision**: the rejection is exact-equality. Not a range, not probabilistic. No false positives.
 
-### Trailing bytes after `EOF`
+### What shapes of bytes after `EOF` does slap accept? (uses-frostmourne-to-butter-its-toast)
 
 Four shapes are possible after the `EOF` trailer: nothing, a 3-byte truncation marker, an EBP metadata JSON blob, or something else.
 
@@ -102,7 +104,7 @@ The three legitimate shapes don't overlap, so dispatch is unambiguous.
 
 IPS32's trailer is `EEOF`, not `EOF`. IPS32 has no documented truncation extension and no EBP analog — trailing bytes after `EEOF` have no defined meaning. Atmosphère (the canonical applier) silently ignores them, so patches in the wild may carry arbitrary junk there without breaking on-console. slap accepts trailing bytes with a warning and discards them on parse; they aren't round-tripped on re-emit.
 
-### RLE count = 0
+### What does slap do with RLE records whose count is zero?
 
 An RLE record with a count of zero is "write this byte zero times" — a no-op. The format is silent on whether this is legal; ZeroSoft's terse spec says "Any nonzero value" for the count field, which reads as disallowing zero without saying so directly. Implementations split: Flips rejects; RomPatcher.js and lua-ips silently no-op.
 
@@ -110,7 +112,7 @@ An RLE record with a count of zero is "write this byte zero times" — a no-op. 
 
 slap never emits a zero-count RLE; the question only comes up when parsing patches from elsewhere.
 
-### EBP
+### How does slap handle EBP patches?
 
 EBP is a sibling format that uses IPS records as its substrate. Same magic (`PATCH`), same trailer (`EOF`), plus a UTF-8 JSON metadata blob tacked on after the trailer. File extension is `.ebp`. Reference implementation: Lyrositor/EBPatcher, from the EarthBound translation community.
 
@@ -119,10 +121,10 @@ EBP is a sibling format that uses IPS records as its substrate. Same magic (`PAT
 - **slap supports EBP.** On parse, detect by shape (trailer starts with `{`); capture the JSON blob verbatim; extract the canonical fields (`patcher`, `title`, `author`, `description`) leniently if they're present.
 - **On create**, emit the four canonical fields with `"patcher":"slap"`. No custom fields.
 - **No shrinking inside EBP.** The reference implementation has no concept of truncation. If a truncation marker were emitted before the JSON, EBPatcher and other EBP-aware tools would either ignore it (best case) or misparse the first 3 bytes of the JSON as a truncation value (worst case). slap doesn't go there. An EBP patch can grow or preserve target size; it can't shrink. Users needing shrink use a StandardIPS patch with a truncation marker instead.
-- **Detection is shape-only, not schema-validating.** The JSON is captured as opaque bytes. No actual JSON parser, no encoding validation. The EBP spec allows any Unicode encoding for the blob, which is absurd-but-true; building a parser to handle the absurd case is end-of-project polish at best.
+- **Detection is shape-only, not schema-validating** (uses-frostmourne-to-butter-its-toast). The JSON is captured as opaque bytes. No actual JSON parser, no encoding validation. The EBP spec allows any Unicode encoding for the blob, which is absurd-but-true; building a parser to handle the absurd case is end-of-project polish at best.
 - **Vanilla IPS tools reject EBP files.** They see trailing bytes that aren't a 3-byte truncation marker and error. EBP works only with EBP-aware tooling.
 
-### IPS32
+### How does slap handle IPS32 patches?
 
 IPS32 is a sibling format with widened offsets. Magic is `IPS32` (5 bytes); trailer is `EEOF` (4 bytes). Record offsets are 4 bytes big-endian instead of 3. Size and RLE encoding are unchanged (still 16-bit). Reference implementations: leoetlino/sips for create; Atmosphère's `libstratosphere` for apply.
 
