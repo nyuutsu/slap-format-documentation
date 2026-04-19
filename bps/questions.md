@@ -1,5 +1,7 @@
 # BPS — open questions
 
+Questions tagged **(uses-frostmourne-to-butter-its-toast)** mark places where the spec grants expressive power wildly beyond what convention actually uses. A compliant implementation would have to handle a possible-space radically larger than the practical-space. The archetype is EBP's trailing-JSON field: convention is a UTF-8 JSON object holding four specific strings, but EBP has no spec — the only actual rule is "it has a JSON at the end of it, therefore it is a valid EBP." The lack of rules creates the anarchy: a UTF-32-encoded JSON of any shape passes the same check, and a strictly-compliant parser has to accept it. These questions carry an extra dimension — not just "what do we do," but "how far do we chase the hypothetical."
+
 ## Checksums
 
 ### Which CRC-32 variant does BPS actually use?
@@ -86,10 +88,10 @@ slap currently computes each CRC over the whole relevant buffer once, not stream
 
 ## Metadata
 
-- **Schema validation on parse** (affordance). Officially XML 1.0 UTF-8; actually up to 2^64 bytes of arbitrary binary. slap's parser stance.
-- **Metadata on create** (affordance). Empty, slap-identifier, XML-shaped, or something else.
-- **Metadata pass-through** (affordance). Surfaced to callers as opaque bytes, parsed structure, or not at all.
-- **Metadata byte-preservation on round-trip** (affordance). If slap canonicalizes anything — whitespace, UTF-8 normalization, BOM — `patch-checksum` breaks on re-emit. Worth an explicit decision, not a discovered invariant.
+- **Schema validation on parse** (uses-frostmourne-to-butter-its-toast). Officially XML 1.0 UTF-8; actually up to 2^64 bytes of arbitrary binary. slap's parser stance.
+- **Metadata on create.** Empty, slap-identifier, XML-shaped, or something else.
+- **Metadata pass-through.** Surfaced to callers as opaque bytes, parsed structure, or not at all.
+- **Metadata byte-preservation on round-trip.** If slap canonicalizes anything — whitespace, UTF-8 normalization, BOM — `patch-checksum` breaks on re-emit. Worth an explicit decision, not a discovered invariant.
 
 ## Size agreements
 
@@ -128,7 +130,7 @@ Shared theme: what does slap do when the parser hits trouble, and how is it cate
 - **Patch shorter than the minimum.** For a patch with `metadata-size = 0`, the floor is 19 bytes (4 magic + 3 × ≥1 varint + 12 footer); a patch with declared `metadata-size > 0` has a correspondingly higher floor. Reject-at-the-door.
 - **Patch truncated mid-varint.** Decoder hits EOF without a terminator byte.
 - **Patch truncated mid-action.** Packed prefix decoded, promised body runs off the end.
-- **Integer-width cap** (affordance). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
+- **Integer-width cap** (uses-frostmourne-to-butter-its-toast). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
 - **Termination overshoot.** byuu's condition is `>=`, not `==`. What to do when finished past `size − 12` or mid-action at the boundary.
 - **Syntactic vs semantic invalidity.** byuu uses one word for both. slap needs two categories with distinct handling.
 - **Negative-zero signed offsets.** `0x80` and `0x81` both encode a zero-magnitude adjustment. Canonical emit, parse-time rejection, warn-only, or silently accept.
@@ -142,7 +144,7 @@ Shared theme: what does slap do when the parser hits trouble, and how is it cate
 
 ## Trailing bytes
 
-- **Trailing bytes after the footer** (affordance). Footer is positionally defined ("last twelve bytes"), so any trailing concatenation consumes the real footer and produces a wrong-but-parseable one. Strict-reject, tolerate-and-strip (by what heuristic), or something else. The EBP-shaped question for BPS.
+- **Trailing bytes after the footer** (uses-frostmourne-to-butter-its-toast). Footer is positionally defined ("last twelve bytes"), so any trailing concatenation consumes the real footer and produces a wrong-but-parseable one. Strict-reject, tolerate-and-strip (by what heuristic), or something else. The EBP-shaped question for BPS.
 
 ## Abort semantics
 
@@ -160,7 +162,7 @@ Shared theme: what does slap do when the parser hits trouble, and how is it cate
 
 - **Cursor-at-bound pedantry.** byuu's prose and pseudocode disagree about whether cursor may transiently equal the upper bound.
 - **Zero-delta Source/TargetCopy.** Legitimate, encodes as `0x80`. Unusual.
-- **"BPS1" as magic vs version.** The `1` hints at versioning that byuu never used. If "BPS2" turned up, would slap try?
+- **"BPS1" as magic vs version** (uses-frostmourne-to-butter-its-toast). The `1` hints at versioning that byuu never used. If "BPS2" turned up, would slap try?
 - **Reference-implementation-vs-prose authority.** Meta-policy: which wins where they disagree.
 
 ## Tooling
