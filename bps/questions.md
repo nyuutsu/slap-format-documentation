@@ -88,7 +88,19 @@ slap currently computes each CRC over the whole relevant buffer once, not stream
 
 ## Metadata
 
-- **Schema validation on parse** (uses-frostmourne-to-butter-its-toast). Officially XML 1.0 UTF-8; actually up to 2^64 bytes of arbitrary binary. slap's parser stance.
+### Does slap validate metadata as XML during parse?
+
+byuu's spec has the carveout in a single paragraph: metadata is "officially" XML 1.0 UTF-8, *and also* "contents are entirely domain-specific" and "a patch with arbitrary metadata contents is still considered valid." The convention and the bypass are granted together. Compliant XML 1.0 parsing (DTDs, entities, namespaces, processing instructions, CDATA, encoding declarations) is a whole language-parser's worth of machinery to handle a field that in practice no one uses for anything beyond a few strings.
+
+**slap's parser captures metadata as opaque bytes. No validation, no warning at parse time.** `Slap/BPS/Parse.hs:81-82` reads `metadataLength` worth of bytes; `Slap/BPS/Types.hs:33` stores them as a `ByteString`. That's the entire parser contract for the field.
+
+The rationale: the parse layer's job is integrity, not presentation. Validating metadata shape is not a "is this a valid patch" question; the spec answers that directly — yes, any bytes are valid. Rejecting non-XML metadata would be slap being stricter than the spec itself. Warning on non-XML metadata would be slap being chatty about something the spec explicitly permits.
+
+BPS patches carrying *any* metadata are genuinely rare, however — 0 of 1,495 patches in the `roms/curated/bps/` corpus (drawn from the romhacking.net archive, 2024-08-01) had a non-empty metadata field. When a patch does carry one, it is an unusual artifact and worth mentioning to the user — but the right place for that mention is the presentation layer (`info` / `explain`), not the parse layer, and the right severity is informational, not warning. That presentation-layer surfacing depends on slap gaining an info channel distinct from its current warning channel; see `notebook.md` for that proposal.
+
+The "metadata as a typed document, not just bytes" ergonomics is also tempting. The clean placement is *also* the presentation layer: parse keeps `ByteString`, and a `MetadataDisplay` sum type (opaque bytes vs. attempted-XML-parse, etc.) blooms at the boundary where XML-awareness pays for itself. See `notebook.md`.
+
+This decision propagates to the other three Metadata items: since parse doesn't commit to XML, create doesn't have to (slap can emit nothing, or emit opaque bytes from `--metadata FILE`), pass-through is straightforwardly opaque, and byte-preservation on round-trip falls out trivially.
 - **Metadata on create.** Empty, slap-identifier, XML-shaped, or something else.
 - **Metadata pass-through.** Surfaced to callers as opaque bytes, parsed structure, or not at all.
 - **Metadata byte-preservation on round-trip.** If slap canonicalizes anything — whitespace, UTF-8 normalization, BOM — `patch-checksum` breaks on re-emit. Worth an explicit decision, not a discovered invariant.
