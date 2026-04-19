@@ -41,9 +41,34 @@ Consequence: slap's source-CRC check is a single gate that detects both content 
 
 Target side: `target-checksum` in normal apply is a CRC of exactly the bytes slap just produced, which are `target-size` by construction. No scope ambiguity on the target side in the apply flow.
 
-- **Source-checksum mismatch policy.** Fatal, advisory, or never checked.
-- **Target-checksum mismatch policy.** Same question, distinct answer possible.
-- **Patch-checksum mismatch policy.** Same again, distinct again. Patch corruption compromises everything downstream.
+### What happens when the computed source CRC doesn't match the patch's declared `source-checksum`?
+
+byuu's spec frames `source-checksum` as "verifies that the input file is correct" — a purpose, not a policy. The spec doesn't say whether a mismatch is fatal, advisory, or ignored.
+
+**slap treats a source CRC mismatch as fatal; `--no-verify` downgrades it to a warning and allows the apply to proceed.** This is the behavior `checkCRC` at `app/Main.hs:742-749` already implements uniformly across every format that populates `verifySourceCRC32`, BPS included. No BPS-specific decision is required; the answer falls out of slap's existing architecture.
+
+"Never checked" is not in slap's vocabulary. If the patch carries a `source-checksum`, slap computes the CRC of the provided source and compares them.
+
+### What happens when the computed target CRC doesn't match the patch's declared `target-checksum`?
+
+Same policy as for source: fatal by default, downgraded to a warning by `--no-verify`. The same `checkCRC` in `app/Main.hs:742-749` handles both sides, and every format slap supports populates `verifyTargetCRC32` (when the format carries one) through the same `Verification` record.
+
+What's semantically distinct about the target side: in the default path, source-CRC has already passed (we wouldn't have reached apply otherwise), and patch-CRC has already passed (we wouldn't have reached parse otherwise). So a target-CRC mismatch at this point means either slap's applier has a bug for this patch, or something impossible has happened. Both are loud-error-worthy; fatal is the right default. The `--no-verify` downgrade is consistent with the source-side behavior for users who have said "proceed through verification failures."
+
+### What happens when the computed patch CRC doesn't match the patch's declared `patch-checksum`?
+
+`patch-checksum` covers the entire patch file except the last four bytes. A mismatch means the patch bytes are corrupt, which makes every field we decoded (source-size, target-size, metadata, actions, source-checksum, target-checksum) come from potentially-garbled bytes. This is qualitatively different from source/target mismatch, where the patch itself is trusted and we're checking files against its declared values.
+
+**slap treats a patch-CRC mismatch as fatal, unconditional. `--no-verify` does not downgrade it.**
+
+The check lives in `Slap/BPS/Parse.hs:35-45` and runs before the body is decoded. On mismatch, `parseBPS` returns `Left (PatchCRCMismatch ...)`, which propagates out before any `Verification` record is built and before `verifySource` runs. `PatchCRCMismatch` is grouped under `-- Parse: integrity` in `Error.hs`, reinforcing the intent: patch-CRC is a parse-time integrity gate, not a verify-time policy check.
+
+Rationale: `--no-verify` means "proceed despite verification failures," and is meaningful when the field values being verified against are trusted. For patch-CRC, the field values themselves aren't trusted; there is nothing coherent to proceed with.
+
+Note the deliberate asymmetry with source/target-CRC, which *do* downgrade under `--no-verify`. Future readers should not "uniformize" this.
+
+Ecosystem is unanimous on "fatal, no override": flips `libbps.cpp:95`, beat `patch.hpp:212`, RomPatcher.js `:128-130`. slap's current behavior aligns.
+
 - **Verification order.** Check patch-checksum before touching anything? Source before applying? Verify-as-you-go?
 
 ## Metadata
