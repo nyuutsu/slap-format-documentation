@@ -47,13 +47,13 @@ Target side: `target-checksum` in normal apply is a CRC of exactly the bytes sla
 
 byuu's spec frames `source-checksum` as "verifies that the input file is correct" — a purpose, not a policy. The spec doesn't say whether a mismatch is fatal, advisory, or ignored.
 
-**slap treats a source CRC mismatch as fatal; `--no-verify` downgrades it to a warning and allows the apply to proceed.** This is the behavior `checkCRC` at `app/Main.hs:742-749` already implements uniformly across every format that populates `verifySourceCRC32`, BPS included. No BPS-specific decision is required; the answer falls out of slap's existing architecture.
+**slap treats a source CRC mismatch as fatal; `--no-verify` downgrades it to a warning and allows the apply to proceed.** This is slap-wide policy for CRC-bearing formats; BPS inherits it. No BPS-specific decision is required.
 
 "Never checked" is not in slap's vocabulary. If the patch carries a `source-checksum`, slap computes the CRC of the provided source and compares them.
 
 ### What happens when the computed target CRC doesn't match the patch's declared `target-checksum`?
 
-Same policy as for source: fatal by default, downgraded to a warning by `--no-verify`. The same `checkCRC` in `app/Main.hs:742-749` handles both sides, and every format slap supports populates `verifyTargetCRC32` (when the format carries one) through the same `Verification` record.
+**Same policy as for source: fatal by default, downgraded to a warning by `--no-verify`.** Uniform across CRC-bearing formats in slap; BPS inherits it.
 
 What's semantically distinct about the target side: in the default path, source-CRC has already passed (we wouldn't have reached apply otherwise), and patch-CRC has already passed (we wouldn't have reached parse otherwise). So a target-CRC mismatch at this point means either slap's applier has a bug for this patch, or something impossible has happened. Both are loud-error-worthy; fatal is the right default. The `--no-verify` downgrade is consistent with the source-side behavior for users who have said "proceed through verification failures."
 
@@ -63,9 +63,7 @@ What's semantically distinct about the target side: in the default path, source-
 
 **slap treats a patch-CRC mismatch as fatal, unconditional. `--no-verify` does not downgrade it.**
 
-The check lives in `Slap/BPS/Parse.hs:35-45` and runs before the body is decoded. On mismatch, `parseBPS` returns `Left (PatchCRCMismatch ...)`, which propagates out before any `Verification` record is built and before `verifySource` runs. `PatchCRCMismatch` is grouped under `-- Parse: integrity` in `Error.hs`, reinforcing the intent: patch-CRC is a parse-time integrity gate, not a verify-time policy check.
-
-Rationale: `--no-verify` means "proceed despite verification failures," and is meaningful when the field values being verified against are trusted. For patch-CRC, the field values themselves aren't trusted; there is nothing coherent to proceed with.
+The check runs during parse, before any body field is decoded. Mismatch produces a parse-level integrity error that propagates out ahead of any verification-layer policy, and therefore ahead of any `--no-verify` logic. This is deliberate: patch-CRC is the integrity gate over the decoding machinery itself, and `--no-verify`'s "proceed despite verification failures" stance is only meaningful when the field values being verified against are themselves trusted.
 
 Note the deliberate asymmetry with source/target-CRC, which *do* downgrade under `--no-verify`. Future readers should not "uniformize" this.
 
@@ -75,14 +73,9 @@ Ecosystem is unanimous on "fatal, no override": flips `libbps.cpp:95`, beat `pat
 
 Three CRCs live in a BPS patch: `patch-checksum` over the patch itself, `source-checksum` over the author's source, `target-checksum` over the author's target. Each has a natural earliest-possible firing time: patch-CRC can be checked as soon as the patch bytes are available (before any parse work); source-CRC as soon as source is loaded and the patch is parsed (before apply); target-CRC only after apply has produced the target.
 
-**slap fires them in that order: patch-CRC during parse, source-CRC before apply, target-CRC after apply. Each gate fails before the next runs.**
+**slap fires the three CRC gates in the order "patch-CRC at parse, source-CRC before apply, target-CRC after apply." Each gate fails before the next runs.**
 
-Three prior entries cover the per-gate policy (see "What happens when the computed X CRC doesn't match..." for source, target, and patch). The order is simply each gate checking what it can check as soon as it can check it. Concretely:
-
-1. `parseBPS` computes patch-CRC against the declared value and returns `Left (PatchCRCMismatch ...)` on mismatch, before decoding any body fields.
-2. `verifySource` computes source-CRC against the declared value (after parse, before apply) and calls `die` on mismatch, or `warn` under `--no-verify`.
-3. `applyBPS` produces the target.
-4. `verifyTarget` computes target-CRC against the declared value and applies the same fatal/downgrade policy.
+Three prior entries cover the per-gate policy (see "What happens when the computed X CRC doesn't match..." for source, target, and patch). The ordering principle is simply: each gate checks what it can check as soon as it can check it, and a failing gate stops the pipeline before downstream work runs.
 
 slap currently computes each CRC over the whole relevant buffer once, not streamed. Verify-as-you-go (pipelining CRC computation into the parse/apply loops) would be an evolution for very large files; slap's whole-file in-memory architecture (see the project README's `[^INPLACE]` footnote) means streaming isn't on the table here. If that architectural premise changes, this ordering answer survives; the only thing that'd change is *how* each CRC is computed, not *when* each gate fires.
 
@@ -92,18 +85,38 @@ slap currently computes each CRC over the whole relevant buffer once, not stream
 
 byuu's spec has the carveout in a single paragraph: metadata is "officially" XML 1.0 UTF-8, *and also* "contents are entirely domain-specific" and "a patch with arbitrary metadata contents is still considered valid." The convention and the bypass are granted together. Compliant XML 1.0 parsing (DTDs, entities, namespaces, processing instructions, CDATA, encoding declarations) is a whole language-parser's worth of machinery to handle a field that in practice no one uses for anything beyond a few strings.
 
-**slap's parser captures metadata as opaque bytes. No validation, no warning at parse time.** `Slap/BPS/Parse.hs:81-82` reads `metadataLength` worth of bytes; `Slap/BPS/Types.hs:33` stores them as a `ByteString`. That's the entire parser contract for the field.
-
-The rationale: the parse layer's job is integrity, not presentation. Validating metadata shape is not a "is this a valid patch" question; the spec answers that directly — yes, any bytes are valid. Rejecting non-XML metadata would be slap being stricter than the spec itself. Warning on non-XML metadata would be slap being chatty about something the spec explicitly permits.
+**slap's parser captures metadata as opaque bytes: no validation, no warning.** The parse layer's job is integrity, and the spec answers the integrity question directly — any bytes are valid. Rejecting non-XML metadata would be stricter than the spec itself. Warning on non-XML metadata would be chatty about something the spec explicitly permits.
 
 BPS patches carrying *any* metadata are genuinely rare, however — 0 of 1,495 patches in the `roms/curated/bps/` corpus (drawn from the romhacking.net archive, 2024-08-01) had a non-empty metadata field. When a patch does carry one, it is an unusual artifact and worth mentioning to the user — but the right place for that mention is the presentation layer (`info` / `explain`), not the parse layer, and the right severity is informational, not warning. That presentation-layer surfacing depends on slap gaining an info channel distinct from its current warning channel; see `notebook.md` for that proposal.
 
 The "metadata as a typed document, not just bytes" ergonomics is also tempting. The clean placement is *also* the presentation layer: parse keeps `ByteString`, and a `MetadataDisplay` sum type (opaque bytes vs. attempted-XML-parse, etc.) blooms at the boundary where XML-awareness pays for itself. See `notebook.md`.
 
 This decision propagates to the other three Metadata items: since parse doesn't commit to XML, create doesn't have to (slap can emit nothing, or emit opaque bytes from `--metadata FILE`), pass-through is straightforwardly opaque, and byte-preservation on round-trip falls out trivially.
-- **Metadata on create.** Empty, slap-identifier, XML-shaped, or something else.
-- **Metadata pass-through.** Surfaced to callers as opaque bytes, parsed structure, or not at all.
-- **Metadata byte-preservation on round-trip.** If slap canonicalizes anything — whitespace, UTF-8 normalization, BOM — `patch-checksum` breaks on re-emit. Worth an explicit decision, not a discovered invariant.
+### What does slap put in the metadata field when creating a patch?
+
+**Nothing, by default — length-zero metadata, a single `0x80` byte for the `metadata-size` varint, no further bytes on the wire.** Users who want metadata opt in via `--metadata FILE`, which embeds the file's contents verbatim.
+
+Rationale: 0 of 1,495 patches in the `roms/curated/bps/` corpus carry any metadata. "Nothing" is the convention; a patch with embedded metadata is the unusual case and should require the user to have asked for it.
+
+Inline metadata (e.g. a hypothetical `--metadata-inline "..."`) isn't currently exposed. Structurally equivalent to the file form — no format obstacle; just a CLI decision that hasn't come up.
+
+### How does slap surface parsed metadata to callers?
+
+**Opaque bytes through the core; a meaningful-representation attempt at the display layer.** The parse layer stores metadata untyped; so do the operations that don't display it (apply, create, convert). Only at the display boundary (`info`, `explain`, `--extract-metadata`) does slap attempt to interpret the bytes as something a user can read.
+
+The "last possible second" principle: no operation that doesn't need to look at metadata *should* look at metadata. Display is the only boundary where interpretation earns its keep, and it does so on demand. See `notebook.md`'s *typed metadata at the presentation layer* entry for the sketched shape.
+
+For programmatic uses that want the bytes raw (notably `info --extract-metadata FILE`), slap keeps them raw; the file on disk matches the bytes the patch carried.
+
+### Does slap preserve metadata bytes exactly on round-trip?
+
+**Yes, for round-trip within BPS.** No canonicalization, no whitespace-normalization, no UTF-8 re-encoding, no BOM munging. If the original metadata was bytes X, re-emitted metadata is bytes X — which is necessary for `patch-checksum` to round-trip, and ratifies what slap already does (no canonicalization step exists in the parse → create → convert path today).
+
+"Round-trip within BPS" covers: explicit `slap convert --to bps` on a BPS patch; any apply-and-recreate flow that reuses the original metadata; any future operation whose effect is "re-emit this BPS patch as BPS." In each case, exact byte preservation is the commitment.
+
+Cross-format round-trip (e.g. `bps → ips → bps`) is out of scope. IPS has no metadata field; there is nothing to preserve. A user who wants metadata to survive that trip re-supplies it via `--metadata FILE` on the final leg.
+
+The explicit decision: preservation is the invariant, not a discovered property. Any future code that would canonicalize metadata bytes needs to know it's breaking this invariant, and `patch-checksum` along with it.
 
 ## Size agreements
 
@@ -111,15 +124,15 @@ This decision propagates to the other three Metadata items: since parse doesn't 
 
 Two sub-cases: source longer on disk than `source-size`, source shorter than `source-size`. byuu's prose doesn't address either — the general "no reading past end of file" rule handles too-short at action-execution time but prescribes no policy, and too-long is completely silent.
 
-**slap runs the existing `Verification` machinery at apply time: `verifySourceCRC32` is fatal (downgraded to warning by `--no-verify`), `verifyFileSizeAdvisory` is warning-only.** Both too-short and too-long fall out of this without special-case BPS code. CRC scope is the whole source file as handed in (see the companion entry above).
+**On source-file length mismatch, slap's default is the CRC-gate-plus-diagnostic pattern it already uses across formats: whole-file source-CRC is the authoritative fatal gate, downgraded to a warning under `--no-verify`; file-size-advisory is a warning-only specific diagnostic layered over it.** Both too-short and too-long fall out of this pattern without BPS-specific handling.
 
 Per case:
 
-- **Too long on disk**: whole-file CRC will not match the authored `source-checksum` (which was computed over exactly `source-size` bytes). Fatal. With `--no-verify`, CRC downgrades to a warning and `applyBPS` proceeds; since the apply loop only consumes source bytes up to the positions its actions name — all within `source-size` for a well-formed patch — a too-long source with the authored bytes as prefix (a ROM with trainer, copier header, or similar wart) still yields the correct target. A too-long source with wrong content yields a wrong target, and the user was warned.
+- **Too long on disk**: whole-file CRC won't match the authored `source-checksum` (which was computed over exactly `source-size` bytes). Fatal by default. Under `--no-verify`, the CRC downgrades to a warning, apply proceeds, and since the action stream only consumes source positions that live within `source-size`, a too-long source with the authored bytes as prefix (a ROM with trainer, copier header, or similar wart) still yields the correct target. A too-long source with wrong content yields a wrong target; the user was warned.
 
-- **Too short on disk**: whole-file CRC will not match. Fatal. With `--no-verify`, CRC downgrades and `applyBPS` begins executing the action stream; the first action whose read position exceeds the actual file length trips `ApplySourceReadOutOfBounds`. User ends up with no output, with diagnostics at step level rather than file level.
+- **Too short on disk**: whole-file CRC won't match. Fatal by default. Under `--no-verify`, the CRC downgrades and apply proceeds; whichever action first references a source position past end-of-file fails with an out-of-bounds diagnostic. The user ends up with no output and a step-level error rather than a file-level one.
 
-slap does not add a pre-flight stat-based size check ahead of the CRC. The CRC gate is authoritative for "is this the right file"; a second gate ahead of it would duplicate responsibility. Specific-sharpness diagnostics are the job of `verifyFileSizeAdvisory` — though see `notebook.md` on that advisory currently being dead code in the common paths.
+slap does not add a pre-flight stat-based size check ahead of the CRC. The CRC gate is authoritative for "is this the right file"; a second gate ahead of it would duplicate responsibility. Sharpening the "wrong size specifically" diagnostic is the file-size-advisory's job — see `notebook.md` on that advisory currently being dead code in the common paths.
 
 Ecosystem is split on this:
 
