@@ -69,7 +69,20 @@ Note the deliberate asymmetry with source/target-CRC, which *do* downgrade under
 
 Ecosystem is unanimous on "fatal, no override": flips `libbps.cpp:95`, beat `patch.hpp:212`, RomPatcher.js `:128-130`. slap's current behavior aligns.
 
-- **Verification order.** Check patch-checksum before touching anything? Source before applying? Verify-as-you-go?
+### In what order do we compute and compare the three CRCs?
+
+Three CRCs live in a BPS patch: `patch-checksum` over the patch itself, `source-checksum` over the author's source, `target-checksum` over the author's target. Each has a natural earliest-possible firing time: patch-CRC can be checked as soon as the patch bytes are available (before any parse work); source-CRC as soon as source is loaded and the patch is parsed (before apply); target-CRC only after apply has produced the target.
+
+**slap fires them in that order: patch-CRC during parse, source-CRC before apply, target-CRC after apply. Each gate fails before the next runs.**
+
+Three prior entries cover the per-gate policy (see "What happens when the computed X CRC doesn't match..." for source, target, and patch). The order is simply each gate checking what it can check as soon as it can check it. Concretely:
+
+1. `parseBPS` computes patch-CRC against the declared value and returns `Left (PatchCRCMismatch ...)` on mismatch, before decoding any body fields.
+2. `verifySource` computes source-CRC against the declared value (after parse, before apply) and calls `die` on mismatch, or `warn` under `--no-verify`.
+3. `applyBPS` produces the target.
+4. `verifyTarget` computes target-CRC against the declared value and applies the same fatal/downgrade policy.
+
+slap currently computes each CRC over the whole relevant buffer once, not streamed. Verify-as-you-go (pipelining CRC computation into the parse/apply loops) would be an evolution for very large files; slap's whole-file in-memory architecture (see the project README's `[^INPLACE]` footnote) means streaming isn't on the table here. If that architectural premise changes, this ordering answer survives; the only thing that'd change is *how* each CRC is computed, not *when* each gate fires.
 
 ## Metadata
 
