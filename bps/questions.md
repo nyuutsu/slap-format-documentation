@@ -2,9 +2,45 @@
 
 ## Checksums
 
-- **Which CRC32 polynomial.** "CRC32" admits IEEE 802.3, CRC-32C, CRC-32/BZIP2, and others. byuu names none.
-- **Endianness of the three uint32s on the wire.** Unstated.
-- **Scope of "the source file" for `source-checksum`** (see also: Size agreements — source file length vs `source-size`). Bytes on disk, or exactly `source-size` bytes? Same question for target.
+### Which CRC-32 variant does BPS actually use?
+
+"CRC32" admits IEEE 802.3, CRC-32C, CRC-32/BZIP2, and others. byuu names none. The prose pins nothing down; his reference implementation in `beat/nall/crc32.hpp` does: init `0xFFFFFFFF`, input and output reflected, final XOR `0xFFFFFFFF`, reversed-poly table constant `0xEDB88320` (normal poly `0x04C11DB7`). That's the variant `reveng` catalogs as **CRC-32/ISO-HDLC** — also known as just "CRC-32", the zlib/PNG/PKZIP/gzip flavor. Check value (CRC of ASCII `"123456789"`) is `0xCBF43926`. Flips and RomPatcher.js use the same variant.
+
+**slap uses CRC-32/ISO-HDLC.** This is the exact variant everyone actually means when they write "CRC32" in this corner of the ecosystem.
+
+As real sticklers, this deserves at least a code comment noting two things:
+
+1. The variant in use is CRC-32/ISO-HDLC.
+2. A case could be made that the Right Thing is to check other CRC-32 variants when the declared checksum doesn't match, since detection is cheap given source and target on hand. This is a parallel to the EBP JSON implementation issue.
+
+That line of thinking is incorrect. EBP JSON flavor-support expansion doesn't muddy the water on "is my patch corrupt or isn't it?" — the metadata is annotation, independent of integrity. CRC-32 variant-support expansion very much would.
+
+### What byte order do the footer checksums use?
+
+The three footer checksums are the only fixed-width integers in the whole wire format; every other number uses the varint encoding, which is byte-order-free by construction. byuu writes them as `uint32` without naming a byte order.
+
+**slap writes and reads the footer little-endian.** Least-significant byte first; bytes at offsets `size − 12`, `size − 8`, `size − 4` hold the low bytes of `source-checksum`, `target-checksum`, `patch-checksum` respectively.
+
+The prose says nothing, but the reference implementations are unanimous:
+
+- **beat** `nall/beat/base.hpp:44-48` and `multi.hpp:196-200`: `writeChecksum` emits `cksum >> 0`, `>> 8`, `>> 16`, `>> 24`. Reader mirrors.
+- **flips** `libbps.cpp:13-21` (`read32`) and `231-238` (`write32`): same pattern both directions.
+- **RomPatcher.js** `RomPatcher.format.bps.js:92` (read path) and `:200` (write path) both set `file.littleEndian = true` before the footer is touched.
+
+Reference-wins-on-silences meta-policy; this one settles itself.
+
+### What counts as "the source file" (and target file) when computing their checksums? (see also: Size agreements — source file length vs `source-size`.)
+
+byuu's prose says "the CRC32 of the source file" without clarifying whether "source file" means "the bytes on disk the user handed us" or "exactly `source-size` bytes of it." The options differ observably when file length doesn't equal `source-size`.
+
+**slap CRCs the whole source file as handed in.** Same shape for target whenever a target-CRC is computed against an existing target (not applicable in normal apply, where target is produced from scratch).
+
+This is the flips approach. beat instead CRCs exactly `source-size` bytes, which observably differs when the file is longer than `source-size` (beat accepts with matching prefix; slap does not, absent `--no-verify`). RomPatcher.js also does whole-file.
+
+Consequence: slap's source-CRC check is a single gate that detects both content mismatch and size mismatch. A too-long source with a matching prefix fails the default path; the user opts in with `--no-verify` if they know better. The full fault-handling is covered in the size-agreement entry.
+
+Target side: `target-checksum` in normal apply is a CRC of exactly the bytes slap just produced, which are `target-size` by construction. No scope ambiguity on the target side in the apply flow.
+
 - **Source-checksum mismatch policy.** Fatal, advisory, or never checked.
 - **Target-checksum mismatch policy.** Same question, distinct answer possible.
 - **Patch-checksum mismatch policy.** Same again, distinct again. Patch corruption compromises everything downstream.
@@ -19,7 +55,30 @@
 
 ## Size agreements
 
-- **Source file length vs `source-size`** (see also: Checksums — scope of "the source file"). Longer on disk: truncate/reject/warn. Shorter: fatal, but diagnosed when?
+### What do we do when the source file on disk isn't exactly `source-size` bytes long? (see also: Checksums — scope of "the source file".)
+
+Two sub-cases: source longer on disk than `source-size`, source shorter than `source-size`. byuu's prose doesn't address either — the general "no reading past end of file" rule handles too-short at action-execution time but prescribes no policy, and too-long is completely silent.
+
+**slap runs the existing `Verification` machinery at apply time: `verifySourceCRC32` is fatal (downgraded to warning by `--no-verify`), `verifyFileSizeAdvisory` is warning-only.** Both too-short and too-long fall out of this without special-case BPS code. CRC scope is the whole source file as handed in (see the companion entry above).
+
+Per case:
+
+- **Too long on disk**: whole-file CRC will not match the authored `source-checksum` (which was computed over exactly `source-size` bytes). Fatal. With `--no-verify`, CRC downgrades to a warning and `applyBPS` proceeds; since the apply loop only consumes source bytes up to the positions its actions name — all within `source-size` for a well-formed patch — a too-long source with the authored bytes as prefix (a ROM with trainer, copier header, or similar wart) still yields the correct target. A too-long source with wrong content yields a wrong target, and the user was warned.
+
+- **Too short on disk**: whole-file CRC will not match. Fatal. With `--no-verify`, CRC downgrades and `applyBPS` begins executing the action stream; the first action whose read position exceeds the actual file length trips `ApplySourceReadOutOfBounds`. User ends up with no output, with diagnostics at step level rather than file level.
+
+slap does not add a pre-flight stat-based size check ahead of the CRC. The CRC gate is authoritative for "is this the right file"; a second gate ahead of it would duplicate responsibility. Specific-sharpness diagnostics are the job of `verifyFileSizeAdvisory` — though see `notebook.md` on that advisory currently being dead code in the common paths.
+
+Ecosystem is split on this:
+
+- **flips**: whole-file CRC, length-mismatch fatal unless `--accept-wrong-input`. Same shape as slap's default.
+- **beat**: CRCs only the first `source-size` bytes; length-mismatch fatal only when too-short. A correct-prefix too-long source applies cleanly in beat without any user intervention.
+- **RomPatcher.js**: whole-file CRC, no size check, optional user-supplied header offset.
+
+slap matches flips's semantics with slap's `--no-verify` escape hatch. The "headered ROM" case is supported, but only through `--no-verify`, which requires the user to affirmatively acknowledge "I know this file is not bit-for-bit the patch's authored source."
+
+Target side: the analogous question for `target-checksum` does not arise in normal apply (target is produced from scratch, so its length is `target-size` by construction).
+
 - **Target output length vs `target-size`.** Underproduction at end-of-stream, overproduction during application, both presumably fatal but check order matters.
 - **SourceRead past source-size.** SourceRead reads `source[outputOffset]`; if `outputOffset ≥ source-size` the per-byte read is off the end. byuu's general "no reading past end of file" applies, but he doesn't address this case specifically for SourceRead.
 - **metadata-size sanity.** The varint is unbounded; nothing prevents a declared `metadata-size` larger than the remaining patch bytes.
