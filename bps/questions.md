@@ -189,7 +189,6 @@ The packed prefix declares the action's code and length; some action codes then 
 **Fatal, parse error.** Same family as truncated-mid-varint and `metadata-size` sanity — declared length exceeds what's available.
 - **Integer-width cap** (uses-frostmourne-to-butter-its-toast). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
 - **Termination overshoot.** byuu's condition is `>=`, not `==`. What to do when finished past `size − 12` or mid-action at the boundary.
-- **Syntactic vs semantic invalidity.** byuu uses one word for both. slap needs two categories with distinct handling.
 ### What do we do about the two encodings for zero-delta (`0x80` vs `0x81`)?
 
 `0x80` decodes to unsigned varint 0, which under the sign/magnitude scheme is sign-0 magnitude-0 — plain zero. `0x81` decodes to unsigned varint 1, which is sign-1 magnitude-0 — "negative zero." Both mean "add zero" semantically; they are indistinguishable in effect but distinct on the wire. Every other signed value has exactly one encoding.
