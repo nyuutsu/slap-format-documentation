@@ -72,3 +72,9 @@ Parse stays `ByteString`. The `MetadataDisplay` sum blooms at the `info`/`explai
 Real question for later: does the XML-awareness *actually* pay for itself even in info/explain? If 0 of 1,495 corpus patches carry any metadata, and the rare ones that do might not even be XML, the typed variant is machinery for a vanishingly rare case. Opaque-bytes display (hex dump or plain text attempt, with a "this is metadata" header) might be sufficient.
 
 Reopen when/if info-channel work happens. Until then: parse captures bytes, info displays bytes, type-shaping waits.
+
+### Widening slap to honor BPS's arbitrary-width-integer frostmourne
+
+The BPS spec endorses arbitrary-width integers; slap caps at `Int`. Removing the cap would mean widening the integer types in the shared `Measure` module (which every format imports from) along with the matching types in `rusty-slap`'s FFI boundary. A real refactor that touches a lot of files, but mechanical — not complicated.
+
+We have seen no patches that come even close. Not a current priority.

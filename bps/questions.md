@@ -187,7 +187,14 @@ The varint encoding requires a byte with the high bit set to terminate the numbe
 The packed prefix declares the action's code and length; some action codes then require further bytes (SourceCopy/TargetCopy's signed delta, TargetRead's inline payload). A patch that decodes a prefix promising more bytes than remain on the wire is structurally broken.
 
 **Fatal, parse error.** Same family as truncated-mid-varint and `metadata-size` sanity — declared length exceeds what's available.
-- **Integer-width cap** (uses-frostmourne-to-butter-its-toast). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
+### How wide does slap let BPS varints and cursor arithmetic go? (uses-frostmourne-to-butter-its-toast)
+
+byuu's spec endorses arbitrary-width integers. slap's shared `Measure` types and Rust FFI boundary are built around machine-word-sized integers.
+
+**slap caps BPS varints and cursor state at `Int` (63-bit signed on 64-bit systems). Values exceeding that produce a specific parse error naming the offending byte and the range.**
+
+For a real BPS patch to need values beyond the cap, one of three things has to hold: (a) a file larger than 9.2 exabytes, (b) a patch that exercises the spec's arbitrary-width carveout by encoding values beyond `Int`, or (c) an authoring-tool bug producing nonsense varints. (b) is the spec-allowed case slap would prefer to support; we just don't, currently. See `notebook.md` for the scope sketch.
+
 ### What do we do when the decoder finishes past `size − 12`, or mid-action at the boundary?
 
 byuu's stopping condition is `offset() >= size() − 12`. `>=` rather than `==` lets two end-states qualify as "stopped": the clean case (last action finished with `offset == size − 12`) and the overshoot case (last action's body consumed bytes that belong to the footer — TargetRead's inline payload, SourceCopy/TargetCopy's signed-offset varint, etc. ate into the 12 footer bytes).
