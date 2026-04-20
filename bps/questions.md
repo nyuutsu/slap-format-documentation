@@ -144,9 +144,27 @@ slap matches flips's semantics with slap's `--no-verify` escape hatch. The "head
 
 Target side: the analogous question for `target-checksum` does not arise in normal apply (target is produced from scratch, so its length is `target-size` by construction).
 
-- **Target output length vs `target-size`.** Underproduction at end-of-stream, overproduction during application, both presumably fatal but check order matters.
-- **SourceRead past source-size.** SourceRead reads `source[outputOffset]`; if `outputOffset ≥ source-size` the per-byte read is off the end. byuu's general "no reading past end of file" applies, but he doesn't address this case specifically for SourceRead.
-- **metadata-size sanity.** The varint is unbounded; nothing prevents a declared `metadata-size` larger than the remaining patch bytes.
+### What do we do when the action stream produces the wrong number of bytes for `target-size`?
+
+Two distinct failure modes. **Overproduction**: an action's declared length would write past `target-size`. Detectable per-action, before the write runs. **Underproduction**: the action stream ends but we haven't reached `target-size` bytes yet. Detectable only at end-of-stream.
+
+**Both fatal, with distinct diagnostics.** Overproduction is an eager per-action check (before each write). Underproduction is a terminal check (once the stream ends). The check order falls out of detectability — overproduction cannot be detected lazily, underproduction cannot be detected eagerly.
+
+Related: this is the enforcement mechanism for the `target-size = 0` degenerate case (any action writes ≥ 1 byte, so the first action overproduces) and for the "zero-action patches with `target-size > 0`" case (end-of-stream underproduces). Candidate for condensation with those entries in the next section.
+
+### What happens when SourceRead's per-byte reads walk past `source-size`?
+
+SourceRead copies `source[outputOffset..outputOffset+length]` to target at the same offsets. If `outputOffset + length > source-size`, the read walks off the end of source. byuu's general "no reading past end of file" rule applies, but the spec doesn't call out SourceRead by name.
+
+**Fatal, detected per-action during apply.** Before a SourceRead begins, slap checks `outputOffset + length ≤ source-size`; failure produces an out-of-bounds source-read error pinned to the offending action's index in the stream. Consequence of byuu's general rule, not a new policy — the same check applies uniformly across every action kind that reads source.
+
+### What do we do when `metadata-size` declares more bytes than the patch actually contains?
+
+`metadata-size` is a varint with no format-imposed upper bound. A broken or malicious patch could declare a `metadata-size` larger than the patch's remaining byte count (or even larger than the integer-width cap slap adopts — see the Malformed section entry).
+
+**Fatal at parse time.** Once `metadata-size` is decoded, the parser compares it against the remaining patch-body bytes; if it exceeds, the patch is malformed and is rejected.
+
+Candidate for condensation: this is a specialization of "Patch truncated mid-varint" / "Patch truncated mid-action" from the Malformed section — all three are "declared length exceeds what's actually there." May fold into a single "declared lengths vs actual bytes" entry when we audit.
 
 ## Malformed patches — structural
 
