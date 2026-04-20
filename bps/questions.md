@@ -170,13 +170,33 @@ Candidate for condensation: this is a specialization of "Patch truncated mid-var
 
 Shared theme: what does slap do when the parser hits trouble, and how is it categorized.
 
-- **Patch shorter than the minimum.** For a patch with `metadata-size = 0`, the floor is 19 bytes (4 magic + 3 × ≥1 varint + 12 footer); a patch with declared `metadata-size > 0` has a correspondingly higher floor. Reject-at-the-door.
-- **Patch truncated mid-varint.** Decoder hits EOF without a terminator byte.
-- **Patch truncated mid-action.** Packed prefix decoded, promised body runs off the end.
+### What do we do when the patch file is shorter than BPS's structural minimum?
+
+The floor is 19 bytes for a metadata-free patch (4 magic + three ≥1-byte varints + 12 footer); a patch with declared `metadata-size > 0` has a correspondingly higher floor.
+
+**Fatal, rejected at parse entry.** Nothing below the structural minimum can be decoded coherently, and the check is cheap (`length < 19`, plus the higher-floor check once `metadata-size` is known).
+
+### What do we do when a varint decode hits EOF without finding a terminator?
+
+The varint encoding requires a byte with the high bit set to terminate the number. A decoder that runs off the end without seeing one has a structurally broken patch on its hands.
+
+**Fatal, parse error.** Nothing further can be trusted — if a varint is truncated, the bytes we thought we were decoding weren't a varint in the first place.
+
+### What do we do when an action's packed prefix decodes but its body runs off the end?
+
+The packed prefix declares the action's code and length; some action codes then require further bytes (SourceCopy/TargetCopy's signed delta, TargetRead's inline payload). A patch that decodes a prefix promising more bytes than remain on the wire is structurally broken.
+
+**Fatal, parse error.** Same family as truncated-mid-varint and `metadata-size` sanity — declared length exceeds what's available.
 - **Integer-width cap** (uses-frostmourne-to-butter-its-toast). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
 - **Termination overshoot.** byuu's condition is `>=`, not `==`. What to do when finished past `size − 12` or mid-action at the boundary.
 - **Syntactic vs semantic invalidity.** byuu uses one word for both. slap needs two categories with distinct handling.
-- **Negative-zero signed offsets.** `0x80` and `0x81` both encode a zero-magnitude adjustment. Canonical emit, parse-time rejection, warn-only, or silently accept.
+### What do we do about the two encodings for zero-delta (`0x80` vs `0x81`)?
+
+`0x80` decodes to unsigned varint 0, which under the sign/magnitude scheme is sign-0 magnitude-0 — plain zero. `0x81` decodes to unsigned varint 1, which is sign-1 magnitude-0 — "negative zero." Both mean "add zero" semantically; they are indistinguishable in effect but distinct on the wire. Every other signed value has exactly one encoding.
+
+**slap emits `0x80` canonically for zero-delta on create; accepts `0x81` on parse with a warning.** (Or the info-channel equivalent, once that channel exists — see `notebook.md`.)
+
+Semantically a no-op, structurally unusual, worth noticing. Same shape as IPS's zero-count RLE: accept, flag, never emit. A negative-zero delta in a patch is a tool-identifying signal for users reviewing patch provenance, which is exactly the sort of chatty-but-quiet observation slap is built to make.
 
 ## Degenerate but structurally valid patches
 
