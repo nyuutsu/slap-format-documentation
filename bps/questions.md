@@ -188,7 +188,13 @@ The packed prefix declares the action's code and length; some action codes then 
 
 **Fatal, parse error.** Same family as truncated-mid-varint and `metadata-size` sanity — declared length exceeds what's available.
 - **Integer-width cap** (uses-frostmourne-to-butter-its-toast). byuu explicitly endorses arbitrary-width integers; slap has a finite integer type (Haskell's `Int` / `Word64`). This is one question with multiple surfaces: where the cap sits, what happens on varint decode overflow at that cap, and what happens on cursor arithmetic overflow where `sourceRelativeOffset += delta` could overflow slap's type even if both operands are individually representable. Cap-and-fail, cap-and-saturate, or proceed-until-else-breaks.
-- **Termination overshoot.** byuu's condition is `>=`, not `==`. What to do when finished past `size − 12` or mid-action at the boundary.
+### What do we do when the decoder finishes past `size − 12`, or mid-action at the boundary?
+
+byuu's stopping condition is `offset() >= size() − 12`. `>=` rather than `==` lets two end-states qualify as "stopped": the clean case (last action finished with `offset == size − 12`) and the overshoot case (last action's body consumed bytes that belong to the footer — TargetRead's inline payload, SourceCopy/TargetCopy's signed-offset varint, etc. ate into the 12 footer bytes).
+
+**Overshoot is fatal, structural parse error.** Any action whose declared length or signed-offset varint would extend past `size − 12` is malformed: it has eaten into the bytes that carry the three footer CRCs. Rejected at decode.
+
+A well-formed BPS patch tiles its actions exactly up to `size − 12`; the footer bytes are untouched by action decoding. byuu's `>=` silently tolerates overshoot under a well-formed-patch assumption; slap does not assume well-formedness it hasn't verified, and treats the two end-states as distinct. Overshoot indicates a corrupt patch or a buggy authoring tool; either way the right response is to fail loudly rather than silently reinterpret footer bytes as action payload.
 ### What do we do about the two encodings for zero-delta (`0x80` vs `0x81`)?
 
 `0x80` decodes to unsigned varint 0, which under the sign/magnitude scheme is sign-0 magnitude-0 — plain zero. `0x81` decodes to unsigned varint 1, which is sign-1 magnitude-0 — "negative zero." Both mean "add zero" semantically; they are indistinguishable in effect but distinct on the wire. Every other signed value has exactly one encoding.
