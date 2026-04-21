@@ -73,6 +73,14 @@ Real question for later: does the XML-awareness *actually* pay for itself even i
 
 Reopen when/if info-channel work happens. Until then: parse captures bytes, info displays bytes, type-shaping waits.
 
+### Inline metadata on create
+
+slap exposes `--metadata FILE` for users who want to embed metadata when creating a BPS patch. A hypothetical `--metadata-inline "..."` would be structurally equivalent — no format obstacle — but isn't currently exposed. Not a decision against inline; just a CLI affordance that hasn't come up.
+
+### Streaming CRC computation
+
+slap computes each CRC over the whole relevant buffer once, rather than pipelining CRC computation into the parse/apply loops. This reflects slap's whole-file in-memory architecture. Streaming becomes relevant only if that premise changes — if it does, the ordering of the three CRC checks (patch first, then source, then target) survives; only the mechanics of how each is computed would change.
+
 ### Widening slap to honor BPS's arbitrary-width-integer frostmourne
 
 The BPS spec endorses arbitrary-width integers; slap caps at `Int`. Removing the cap would mean widening the integer types in the shared `Measure` module (which every format imports from) along with the matching types in `rusty-slap`'s FFI boundary. A real refactor that touches a lot of files, but mechanical — not complicated.
