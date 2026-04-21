@@ -193,10 +193,12 @@ slap rejects it. The parser reads the last twelve bytes as the footer, computes 
 ### Does slap create BPS patches in linear or delta mode?
 
 Right now slap makes delta patches. Linear creation is an option permitted by the spec; it has not been thoroughly explored.
-- **Patch-size minimization.** Merge adjacent actions of the same type? Prefer SourceRead or SourceCopy when both work?
-- **Determinism.** Bit-identical output across invocations for a given `(source, target)`.
 
 ## Minor / pedantic
 
-- **Cursor-at-bound pedantry.** byuu's prose and pseudocode disagree about whether cursor may transiently equal the upper bound.
+### Can a source/target cursor transiently equal the upper bound?
+
+byuu's prose says a cursor "can never be less than zero, or greater than or equal to" the relevant bound — a strict `<` condition. byuu's pseudocode, however, increments the cursor after each byte read, so at the end of a copy action the cursor briefly equals the bound before the loop exits. No read ever happens from the out-of-range position, so the distinction has no observable effect on a valid patch.
+
+slap follows the pseudocode: a cursor may equal the upper bound at the end of an action that completes. The prose's stricter reading would require bookkeeping that changes no output.
 
