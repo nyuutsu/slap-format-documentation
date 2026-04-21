@@ -182,16 +182,17 @@ slap accepts all of these at parse time (they are wire-format-valid) and rejects
 
 ## Trailing bytes
 
-- **Trailing bytes after the footer** (uses-frostmourne-to-butter-its-toast). Footer is positionally defined ("last twelve bytes"), so any trailing concatenation consumes the real footer and produces a wrong-but-parseable one. Strict-reject, tolerate-and-strip (by what heuristic), or something else. The EBP-shaped question for BPS.
+### What happens if a BPS patch has bytes appended after the footer?
 
-## Abort semantics
+byuu's spec says the footer is the last twelve bytes of the patch, and `patch-checksum` covers every byte before those twelve. Appending bytes means the footer is no longer at the end, and the spec is no longer being followed — the file is malformed.
 
-- **What "abort" means behaviorally.** Diagnostics, exit code, whether original source is touched.
-- **Partial target disposition.** Delete, truncate, preserve, temp-file-and-atomic-rename, or memory-stream-commit-on-success.
+slap rejects it. The parser reads the last twelve bytes as the footer, computes `patch-checksum` over the rest, and the check fails. No special detection for "trailing bytes"; no heuristic for stripping. BPS leaves no room for an EBP-style "trailing something" convention because the spec closes that door.
 
 ## Creation strategy
 
-- **Linear vs delta creation.** One mode, both, hybrid.
+### Does slap create BPS patches in linear or delta mode?
+
+Right now slap makes delta patches. Linear creation is an option permitted by the spec; it has not been thoroughly explored.
 - **Match-finding approach (if delta).** Suffix array, rolling hash, naive scan, bsdiff-style, xdelta-style.
 - **Patch-size minimization.** Merge adjacent actions of the same type? Prefer SourceRead or SourceCopy when both work?
 - **Determinism.** Bit-identical output across invocations for a given `(source, target)`.

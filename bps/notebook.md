@@ -77,6 +77,10 @@ Reopen when/if info-channel work happens. Until then: parse captures bytes, info
 
 slap exposes `--metadata FILE` for users who want to embed metadata when creating a BPS patch. A hypothetical `--metadata-inline "..."` would be structurally equivalent — no format obstacle — but isn't currently exposed. Not a decision against inline; just a CLI affordance that hasn't come up.
 
+### In-memory-ness of slap
+
+Everything slap does currently operates on at-least-one full copy of the ROM in memory, and often more (BPS delta creation holds source + target + a suffix array of source, together running several multiples of the source size). We are at least idly curious about ways to be more efficient with memory. Streaming — processing source and target in chunks without loading everything — is one option we have heard of. It appears to have real downsides: some creation modes become impractical, some apply operations need buffered state, cross-format conversion gets harder.
+
 ### Streaming CRC computation
 
 slap computes each CRC over the whole relevant buffer once, rather than pipelining CRC computation into the parse/apply loops. This reflects slap's whole-file in-memory architecture. Streaming becomes relevant only if that premise changes — if it does, the ordering of the three CRC checks (patch first, then source, then target) survives; only the mechanics of how each is computed would change.
