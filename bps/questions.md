@@ -18,7 +18,7 @@ The three footer checksums are the only fixed-width integers in the whole wire f
 
 beat, Flips, and RomPatcher.js are unanimous on this.
 
-### What counts as "the source file" (and target file) when computing their checksums? (see also: Size agreements — source file length vs `source-size`.)
+### What counts as "the source file" (and target file) when computing their checksums? (see also: Size agreements — source-file length mismatch.)
 
 byuu's prose says "the CRC32 of the source file" without clarifying whether "source file" means "the bytes on disk the user handed us" or "exactly `source-size` bytes of it." The options differ observably when file length doesn't equal `source-size`.
 
@@ -118,12 +118,6 @@ SourceRead copies `source[outputOffset..outputOffset+length]` to target at the s
 
 slap treats it as fatal, like every other source-read overrun. The error names the specific action that tried it. Nothing special about SourceRead here — the same rule applies to SourceCopy and any other action that touches source.
 
-### What do we do when `metadata-size` declares more bytes than the patch actually contains?
-
-`metadata-size` is a varint with no format-imposed upper bound. A broken or malicious patch could declare a value larger than the remaining patch-body bytes.
-
-slap rejects the patch at parse time. The same shape of problem appears in "patch truncated mid-varint" and "patch truncated mid-action" below — all three are "declared length exceeds what's actually there."
-
 ## Malformed patches — structural
 
 Shared theme: what does slap do when the parser hits trouble, and how is it categorized.
@@ -134,17 +128,14 @@ The floor is 19 bytes for a metadata-free patch (4 magic + three ≥1-byte varin
 
 slap rejects at parse entry. Nothing below the structural minimum can be decoded coherently.
 
-### What do we do when a varint decode hits EOF without finding a terminator?
+### What do we do when the patch declares more bytes than it contains?
 
-The varint encoding requires a byte with the high bit set to terminate the number. A decoder that runs off the end without seeing one has a structurally broken patch on its hands.
+A few shapes of this come up:
+- A varint runs off the end of the patch before reaching a terminator byte.
+- A decoded `metadata-size` declares more bytes of metadata than remain on the wire.
+- An action's packed prefix decodes, but the body it promises (TargetRead's inline payload, SourceCopy/TargetCopy's signed-delta varint) runs off the end.
 
-slap rejects as a parse error. Nothing further can be trusted — if a varint is truncated, the bytes we thought we were decoding weren't a varint in the first place.
-
-### What do we do when an action's packed prefix decodes but its body runs off the end?
-
-The packed prefix declares the action's code and length; some action codes then require further bytes (SourceCopy/TargetCopy's signed delta, TargetRead's inline payload). A patch that decodes a prefix promising more bytes than remain on the wire is structurally broken.
-
-slap rejects as a parse error. Same family as truncated-mid-varint and `metadata-size` sanity — declared length exceeds what's available.
+slap rejects all three at parse time. Each is structurally broken in the same way: the patch claims more bytes than it has.
 
 ### How wide does slap let BPS varints and cursor arithmetic go? (uses-frostmourne-to-butter-its-toast)
 
