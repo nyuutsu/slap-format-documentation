@@ -199,9 +199,4 @@ Right now slap makes delta patches. Linear creation is an option permitted by th
 ## Minor / pedantic
 
 - **Cursor-at-bound pedantry.** byuu's prose and pseudocode disagree about whether cursor may transiently equal the upper bound.
-- **"BPS1" as magic vs version** (uses-frostmourne-to-butter-its-toast). The `1` hints at versioning that byuu never used. If "BPS2" turned up, would slap try?
 
-## Tooling
-
-- **`info` output scope.** Action-type histogram, total bytes moved, largest copy, metadata dump, checksums, size deltas.
-- **`explain` output scope (and `explain --records`).** What the human-readable summary shows versus what the records-level dump emits.
