@@ -193,19 +193,15 @@ slap rejects it. The parser reads the last twelve bytes as the footer, computes 
 ### Does slap create BPS patches in linear or delta mode?
 
 Right now slap makes delta patches. Linear creation is an option permitted by the spec; it has not been thoroughly explored.
-- **Match-finding approach (if delta).** Suffix array, rolling hash, naive scan, bsdiff-style, xdelta-style.
 - **Patch-size minimization.** Merge adjacent actions of the same type? Prefer SourceRead or SourceCopy when both work?
 - **Determinism.** Bit-identical output across invocations for a given `(source, target)`.
 
 ## Minor / pedantic
 
 - **Cursor-at-bound pedantry.** byuu's prose and pseudocode disagree about whether cursor may transiently equal the upper bound.
-- **Zero-delta Source/TargetCopy.** Legitimate, encodes as `0x80`. Unusual.
 - **"BPS1" as magic vs version** (uses-frostmourne-to-butter-its-toast). The `1` hints at versioning that byuu never used. If "BPS2" turned up, would slap try?
-- **Reference-implementation-vs-prose authority.** Meta-policy: which wins where they disagree.
 
 ## Tooling
 
 - **`info` output scope.** Action-type histogram, total bytes moved, largest copy, metadata dump, checksums, size deltas.
 - **`explain` output scope (and `explain --records`).** What the human-readable summary shows versus what the records-level dump emits.
-- **Metadata surfacing under `info` / `explain` when the payload isn't XML.** Concrete user-visible case of the "metadata pass-through" affordance.
