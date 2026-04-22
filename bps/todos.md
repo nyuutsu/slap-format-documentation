@@ -16,3 +16,9 @@ See `docs/bps/questions.md` → "Which CRC-32 variant does BPS actually use?" fo
 `Slap/BPS/Types.hs:77-80` (`decodeSignedVarint`) silently maps both `0x80` and `0x81` to zero. The design (questions.md → "What do we do about the two encodings for zero-delta") says slap should accept `0x81` on parse with a warning. Need to (a) detect the `0x81` case at decode time and (b) surface the warning through a parse-time warnings channel.
 
 Depends on parse gaining a warnings channel — same prerequisite as the IPS-family items that want to warn during parse (unsorted records, overlap, zero-count RLE). See `ips/todos.md` item 4 for that infrastructure work.
+
+### `createBPS` size guard
+
+`createBPS` is infallible: `SourceFileContents -> TargetFileContents -> ByteString -> PatchFileContents`. It accepts any source and target without checking sizes against slap's 63-bit Int cap. On 64-bit systems the cap is ~9 EB and real inputs never approach it; on 32-bit systems Int is 31-bit, so files over ~2 GB would silently produce a malformed patch via `fromIntegral` truncation in the varint encoder.
+
+Structural parallel to `ips/todos.md` item 1 (`createIPS` target-size guard). Low priority — nobody runs slap on 32-bit in practice — but the fix shape is the same: change the return type to `Either SlapError PatchFileContents` and add a guard that rejects when `max(sourceLen, targetLen)` exceeds the cap.
