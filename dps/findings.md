@@ -10,7 +10,7 @@ dpspatcher.exe (reference implementation), and direct byte inspection.
 
 FORMAT ORIGIN
 -------------
-DPS (Deufeufeu Patching System) was created by Marc de Falco
+DPS was created by Marc de Falco
 ("deufeufeu" on GBAtemp) for NDS ROM translations. NDS ROMs have
 an internal filesystem; modifying files reshuffles the entire image,
 making byte-offset formats like IPS useless. DPS solves this by

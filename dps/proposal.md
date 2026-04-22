@@ -1,6 +1,6 @@
 # DPS -- Research and Proposal
 
-Slap's design decisions for DPS (Deufeufeu Patching System). DPS has no
+Slap's design decisions for DPS. DPS has no
 formal written spec; the format's behavior is reverse-engineered from
 `dpspatcher.exe` (the sole reference implementation) and from the
 format's one known specimen (the Jump Ultimate Stars English translation
