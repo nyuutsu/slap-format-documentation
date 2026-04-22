@@ -60,15 +60,21 @@ Ecosystem: Flips, RomPatcher.js, and lua-ips all apply overlapping records in wi
 
 ### How does slap handle the post-EOF truncation marker, and when does it emit one?
 
-IPS records write bytes; they can't remove them. Target size is either declared explicitly by the truncation marker — three big-endian bytes after `EOF` — or derived as `max(sourceSize, maxRecordEnd)` when no marker is present. The marker declares the final size absolutely: a value greater than `maxRecordEnd` grows the target (zero-filling the gap); a value less than `sourceSize` shrinks it. Shrinking specifically requires the marker; growing doesn't — records can grow on their own.
+The truncation marker is three big-endian bytes placed after the `EOF` trailer, declaring the target file's final size. When no marker is present, the final size comes out of the patch itself: either the source's length, or the point the records reach, whichever goes further.
 
-**slap accepts the marker on parse.** On create, slap's plan is to emit the marker when `target < source`. Same semantics as Flips and RomPatcher.js. (Emit-on-shrink is not yet implemented; see todos.md item 2.)
+**slap emits the marker only when the target is smaller than the source.** Growing the target is already expressible by records alone, so no marker is needed there. Shrinking isn't — records write bytes, they don't remove them. Flips and RomPatcher.js emit on the same condition.
+
+**On apply, slap takes the marker's value as the final size.** The output starts as a copy of the source — or as much of it as fits, zero-padded out to the declared size if the source is shorter. Records overlay on top. Anything they don't touch stays where it started: a source byte, or a zero. This matches RomPatcher.js.
+
+Flips reads the marker differently on apply: as an upper bound, not an absolute declaration. When the marker asks for a size larger than both the source and the records' reach, Flips ignores the surplus and produces a smaller output. In practice this disagreement is rare — neither Flips nor RomPatcher.js produces a patch that triggers it.
+
+(Emit-on-shrink is not yet implemented; see todos.md item 2.)
 
 Historically the marker wasn't an extension to a pre-existing marker-less format. The earliest tooling we can examine — SNESTool (MCA/Elite, 1996, DOS) — treats patches with and without it as two distinct formats, "IPS" and "IPS 2." Later tooling collapsed the distinction into a single format with an optional trailer.
 
 What varies across implementations is the acceptance policy, not the wire format:
 
-- **Modern appliers** (Flips, RomPatcher.js) accept any 3-byte marker and resize to its value.
+- **Modern appliers** (Flips, RomPatcher.js) accept any 3-byte marker. The two differ on apply-side interpretation — see above.
 - **SNESTool** accepts the marker only when `(size & 0xFFF) == 0x200` — the SMC-copier-header pattern any "2ᴺ KiB + 0x200" SNES ROM exhibits. Otherwise it rejects with `No File Cut, IPS2 size error !`.
 
 **Future flag: `--require-smc-shaped-target-size`** (draft name). When set on create, slap refuses to emit a marker whose declared target size doesn't satisfy the SMC pattern, making the patch acceptable to SNESTool's parser. No-op for patches that don't need a marker. Not yet implemented.
