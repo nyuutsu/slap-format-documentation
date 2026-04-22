@@ -2,7 +2,7 @@
 
 A BPS patch encodes the byte-by-byte construction of a target file, using a source file as a dictionary. The patch carries a magic string, the declared sizes of source and target, an opaque metadata field, a stream of actions, and three CRC32 checksums.
 
-BPS is linear. The target begins as a zero-byte file and is written strictly forward: each action writes some number of bytes to the end of the target, advancing the write position by that many bytes. There is no seek, no backtrack, no overwrite. A patch applier produces the target by reading actions in order and executing them in order.
+BPS patches build the target from nothing, forward-only. The target begins as a zero-byte file and is written strictly forward: each action writes some number of bytes to the end of the target, advancing the write position by that many bytes. There is no seek, no backtrack, no overwrite. A patch applier produces the target by reading actions in order and executing them in order.
 
 ## Glossary
 
