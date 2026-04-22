@@ -11,3 +11,9 @@ One way to eliminate the redundancy without changing wire-order apply semantics:
 Cost: `O(targetSize)` bits for the mask, plus `O(K)` to build it from the record list. Two passes total instead of one, but each pass writes less.
 
 Not planned. The current approach is safe, reliable, and easy to reason about; the savings are small on typical inputs. Noted here in case the performance shape of some future use case changes.
+
+### Warning on growth-marker-with-gap apply
+
+When an IPS patch's truncation marker declares a target size larger than both the source and the records' reach, slap and Flips produce different outputs — slap zero-fills the gap up to the declared size, Flips stops at the source-or-records mark. See the truncation entry in questions.md for the full story.
+
+It'd be nice to warn the user when slap sees this shape, since the same patch applies differently under Flips. The detection needs source size in hand, so the check belongs at apply time. slap has no apply-time warnings channel today; every `apply*` function returns `Either SlapError TargetFileContents` with no slot for diagnostics. Adding that channel is the real cost. Noted here in case it gets built for some other reason; then this warning is a free addition.
