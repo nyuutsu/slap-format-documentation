@@ -1,0 +1,219 @@
+Hai there you SNES fans,
+
+This Tool is made for PROCOM 2. (the one I have)
+I have a small Upgrade in my procom, so i can run profighter/wildcard
+files as well. 
+
+Update in version 1.8
+---------------------
+New: Action Replay
+
+What is action replay? It is a cartridge you can put between the snes
+and a game cartridge (codes don't work well without cartridges!)
+This allows you to search for trainer locations and activate trainers.
+The activate part is the same as in this program.
+
+Idea for this replay stuff came from DAX, he wrote a similair program
+on the PC. (Not yet released) . Hope you get that Wildcart soon man !
+
+How to work with it:
+
+Enter the replay values max 4 at a time. Then HIGHLIGHT the action replay
+on/off box. When you now send or save a file it will patch the
+1st part of the program, bending the nmi vector and inserting a little
+piece of new nmi code. 
+
+code1: 7e1234 56  ;means put value 56 in adres 7e1234
+code2: 7e0098 XX  ;XX must fill in a number here, otherwise it's 0!!!                    
+
+Use the available codes to experiment......
+
+Possible problems:
+
+1. If a program is neatly programmed there will be an info area ( FILE
+   INFO in the utility ! ) , that gives you name/size/company etc. 
+   When it gives scrambled/fucked up File Info , then the Action Replay 
+   wont work on that game . 
+   Coz then the programmers of the game put there own program code there ,
+   ( which shouldnt be there ! its very rare.. and normally your dealing
+   with a preview/beta version ! ) . 
+   So if you want to be sure that the trainer codes will work , click on 
+   the File Info box first !
+ 
+2. The real Action Replay has a switch to put the trainer on/off
+   during the execution of the game.
+   At the moment this is not possible with this Util.
+   Some replay codes require turning off at a certain point in the gameplay.
+   You can't use these codes.
+
+3. You have used replay codes from another version > jap/eur/usa     
+
+;----------------------------------------------------------
+
+New: Goldfinger
+
+Goldfinger is a tool for the wildcard copier.
+Goldfinger codes change certain bytes at certain places.
+The trainer possibilities with this are different from action replay,
+but also very powerful.
+
+The 1st 5 digits mean there is to be a change at offset...
+The last 6 digits are the new bytes to replace
+
+Enter the values and HIGHLIGHT the goldfinger on/off box.
+
+G 00FC1 EAEAEA   ; puts 3 nop's (ea) at address $8FC1
+G 00200 EAXXXX   ; put only 1 nop at adress $8200
+
+So XX is DIFFERENT compared to action replay codes, also
+make sure the XX's go in pairs so 1 X is NOT ok.
+
+Adresses are an offset from start of file + $200.
+
+Watch out:
+If you send splitted files, goldfinger codes will only be used
+on the 1st file.
+
+Question to wildcard/goldfinger owners:   
+The range off the adresses cannot exceed 8mbit ??
+
+I have no codes for fig/swc files, so I don't know if all things
+stay the same with these because of high low send   ?
+
+;---------------------------------------------------------------
+These 2 combined options may result in +12 trainers
+Which cartridge can beat this???
+
+BE AWARE, THERE ARE LOTS OF REPLAY/GOLDFINGER CODES WHICH ARE
+NOT CORRECT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+WATCH OUT FOR 100% WORKING CODE LISTS. YEP, YOU GUYS CAN HELP
+US OUT WITH THAT ONE!
+
+There is also another thing called 'game genie' but their method
+of making trainers is a little unclear to me at the moment, if
+we know how that works, we should be able to convert those
+codes into goldfinger or replay codes.... 
+;--------------------------------------------------------------- 
+
+Changed:
+Alt also cancels send/save.
+
+Update in version 1.7
+----------------------
+New: Profighter/wildcard send & run.
+
+(Sends adapted rom, then the file)
+
+16mb profighter/wildcard send (splitted): here's what to do:
+
+1. send part 1 with fig/swc send & run
+2. set bankstart to $80
+3. send part 2 with SMC send & run
+(Don't use fig/smc send TWICE for 1 splitted game, because the 2nd time
+it will send the rom again, and overwrite your game in memory.) 
+
+(Run always checks on bit 6 set in header+2, if set, run is canceled,
+ a 16mbit part 1 file has it set. Also splitted smc files will not
+run until the last part is send.)
+
+If you send the 'highrom.smc', then the profighter file it will NOT
+work, because this rom has incomplete send/receive routines.
+Only use the highdos.smc for 'snes disk loading'.
+
+In the 'Save' option profighter files will NOT be sent high/low,
+therefore you cannot run it immediatly afterwoods.
+
+New: cancel send if you press ALTERNATE.
+
+New: File info for fighter/wildcard files.
+Add header/remove header on $2000 boundery lengths.
+Little extra time between each save on split files.
+(saving to a: switch disks etc..)
+Whole new format routine: Counter/Choose A/B...
+
+;------------------------------------------------------------
+What does Send & Save to Snes: 
+
+1) Unpack the 1 pass copier, send it to the Snes and run it.
+
+2) Load & Send blocks of 512k to the Snes until the end of the file
+   is reached, this means that you guys with 1 meg machines can use
+   this too!!
+
+3) Copy,Patch the loadname and send it to the Snes.
+   (points will be skipped) so ROADRUN.NER will become
+   ROADRUNNER
+
+4) Activate Snes Saving mode. Screen should now show:
+   
+     Saving.....  [000]
+   
+   Make sure that BEFORE this point you have a blank formatted disk
+   inside the Procom/...  High Density Drive.
+   If all goes well it starts saving, counter will decrease.
+
+When saving is done OR ANY error occurred it will return to 
+the copier screen. So make sure all is ok, before deleting the original
+on your harddisk!
+
+5) You can now RUN the file in memory, Send & Save the next one, or
+   use the 1 pass copier, this thing copies a whole disk in 1 pass.
+    
+
+Bankstart option:
+-----------------
+Snes is divided in 256 ($ff) blocks of 8192 ($2000) bytes.
+This adds up to 256*8192=2097152 or $200000 bytes or 16mbit.
+Just before each block you send, this program sends the block
+number, normally games are loaded from block 0 >.
+Every time a block is send, the bank (blocknumber) will be increased.
+
+Send & Save to Snes Drive:
+--------------------------
+ALWAYS keep bankstart at $00 !
+
+
+Send & No Run:
+--------------
+
+1 part games: make sure that bankstart is set at $00 !!
+
+How to send a 16mb file:
+
+1) set bank start to 00 & send part 1 (goes to 00-7f)
+2) set bank start to 80 & send part 2 (goes to 80-ff)
+
+How to send a splitted 12mb file:
+
+1) set bankstart to 00 & send part 1
+2) set bankstart to 40 & send part 2
+3) set bankstart to 80 & send part 3
+
+How to send a splitted 8mb file:
+
+step 1 + 2 of 12mb
+
+easy isn't it ?
+--------------------------------------------------------------------------
+This program can be renamed to *.prg or works as *.acc
+
+when loaded as *.acc it reserves about 20k of memory, when activated
+it reserves an extra 530k, when leaving it free's the 530k.
+
+Trouble with File-Info:
+Each program is supposed to have a data area at $ffc0
+there must be name, size, etc.. info.
+BUT, some programmers do not use this area, so File-Info does not
+work always.(Maybe too many beta versions?)
+Some names of companies are not correct, don't look at  me!
+Each company has a certain hex number, I just convert that to
+my own list, perhaps some companies use wrong numbers...
+
+Hint:
+-----
+To use the 1 pass copier pick option Send & Save, when the fileselector
+appears, press cancel. 
+
+
+--------------        M.C.A.      ----------------
+

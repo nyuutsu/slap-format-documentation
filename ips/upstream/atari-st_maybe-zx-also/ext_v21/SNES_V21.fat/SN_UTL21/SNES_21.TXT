@@ -1,0 +1,54 @@
+Doc for Snes util 2.1
+---------------------
+
+This program may not be sold for ANY amount of money.
+Or used for any other commercial purpose.
+
+Still not available in this Utility :
+
+ - Send Highrom games doesn't work on profighter Q.
+ - Send & Save doesn't work on copiers with the 2nd type of processor.
+   ( Wildcard & Pro Fighter Q )
+
+Seems like the Upgraded Procom II is still the best buy...
+ 
+ NO Thanks to the Companies who made the Wild Card + Pro fighter Q ! 
+ For NOT giving out any info at all , there for NOT helping out in having 
+ good and decend Tools produced for there own Fuckin products !  
+
+
+Updates in version 2.1
+----------------------
+A little change in the layout.
+
+New: PAL-FIX (for games which don't run on pal machines!)
+New: NTSC-FIX (for game which don't run on us/jap machines)
+
+These options check the file for ... Instructions, if found
+they will be patched.
+
+These are the most frequent ones.
+
+New: the Memory type in the game info says: Normal or Highrom
+     (Checks on headers with xxxx7000/xxxx3000/xxxxxx80)
+
+New: A timeout in send routines.
+New: removes xxxx21 header bytes, due to these things, games didn't run.
+New: an extra slowfix, looks for $0c42xx0d4201 (table type)
+
+New: 10 new company names.
+
+Split/join: Changed header routines for Highrom games.
+
+New: Repair Header; asks for normal or Highrom and Single or Multiple file.
+     If the size of the file is incorrect, you'll have to fix this yourself.
+     Fixes number of blocks, deletes xxxx21xx headers, replaces Highrom
+     with xxxx30807703 or xxxx70807703 and sets aabb04 (snes game file).
+     or fix multiple xxxx4000 or xxxx0000, leaves system bytes be (xxxxx201)
+
+
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ Updated By :  ~~ M.C.A. of  ELITENDO  ~~
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ Testing By :  -={Sledge of Elitendo}=- 
