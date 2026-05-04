@@ -5,7 +5,7 @@ review date. Scoped to the existing code, pre-refactor. For the
 structural rewrite case, see `slap-implementation-notes.md`. For
 what the format actually is, see `spec.md`.
 
-Each item categorised by whether it would produce wrong output on a
+Each item categorized by whether it would produce wrong output on a
 reasonable real patch, or whether it's a missing validation / type
 cleanliness issue.
 
@@ -112,7 +112,7 @@ commit to any particular format's encoding. That's what makes the
 field "transportable" — its internal shape is meaningful to any
 consumer that wants to reason about per-byte-original-state.
 
-Per-conversion behaviour:
+Per-conversion behavior:
 
 - **PPF3 → PPF3** with undo carried through: parse into `UndoHunk`s,
   re-encode from `UndoHunk`s. Round-trips the format's inline undo
@@ -164,7 +164,7 @@ present for possible future use.
 
 **Fix**: read and validate zero before skipping.
 
-## Priority 3: type cleanliness / labelling
+## Priority 3: type cleanliness / labeling
 
 ### PPF2 validation hardcodes `PPFImageType = BIN`
 
@@ -178,7 +178,7 @@ This doesn't produce wrong output. It's type-level conflation that
 the four-way split would naturally resolve (PPF2's validation type
 has no imagetype; PPF3's does).
 
-### Error labelling when version byte is unknown
+### Error labeling when version byte is unknown
 
 `detectVersion` returns `BadVersion LabelPPF1 ...` for any file
 starting with `"PPF"` but not `"PPFN"` for N∈{1,2,3,4}. The PPF1
@@ -195,7 +195,7 @@ any of the four 5-byte probes and falls through to the real
 they're all `Maybe`/`Bool` and every parser sets the ones it
 doesn't use to `Nothing`/`False`. A sum-type-per-version or
 per-version module (see the four-way split note) would remove
-this without changing any behaviour.
+this without changing any behavior.
 
 ## Non-issues
 
@@ -215,7 +215,7 @@ Correct — undo writes at the same offset as apply, using the
 
 ### PPF4 ADD offset field ignored
 
-Reference behaviour. ppfmaker.cpp writes 0, patcher.lua ignores
+Reference behavior. ppfmaker.cpp writes 0, patcher.lua ignores
 the offset field for ADD commands. slap parses the offset and
 silently ignores it during apply. Matches reference.
 

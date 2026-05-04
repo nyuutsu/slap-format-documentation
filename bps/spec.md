@@ -179,7 +179,7 @@ The last twelve bytes of a BPS patch are three 32-bit CRC32 checksums:
 
 The checksums appear at the end of the patch so that a patcher can compute them incrementally as the patch is produced.
 
-byuu's spec characterises the three checksums as integrity-only: they catch corruption and mistakenly incorrect files, but are deliberately not cryptographically secure. The spec suggests that if security is a serious concern, a stronger hash such as SHA-256 can be placed in the metadata — or else BPS is not the right format for the use case.
+byuu's spec characterizes the three checksums as integrity-only: they catch corruption and mistakenly incorrect files, but are deliberately not cryptographically secure. The spec suggests that if security is a serious concern, a stronger hash such as SHA-256 can be placed in the metadata — or else BPS is not the right format for the use case.
 
 ## Example
 

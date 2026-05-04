@@ -12,7 +12,3 @@ Both functions populate a preallocated output buffer via `Data.ByteString.Intern
 
 Alternatives: pre-compute bounds-check pass (walks records twice, fine for typical sizes); push the apply loop into Rust (clean boundary but real implementation cost for marginal prettiness gain). If Rust grows an "apply record stream to buffer" primitive for performance reasons, inheriting the apply loop into it is the natural consolidation.
 
-### warn exists
-
-warn :: String -> IO () in app/Main.hs. Eight verification helpers call it under --no-verify to emit runtime comparison messages. Raw String because SlapWarning has no constructors for these values. It probably should not exist & should instead use SlapWarning.
-
