@@ -26,7 +26,7 @@ out.
 | PPF1 applier source | `pdx-ppf1/sources/applyppf.c` (era-contemporary) |
 | PPF1 Amiga binaries | `pdx-ppf1/amiga-bin/{MakePPF,ApplyPPF}` (m68k, no source) |
 | PPF2 spec doc | `pdx-ppf2/ppftools/ppfdev/PPF2.txt` (era-contemporary) |
-| PPF2 source | None released. Only binaries ship. |
+| PPF2 source | Not present in the materials we have |
 | PPF3 spec doc | `ppf-master/ppfdev/PPF3.txt` |
 | PPF3 creator source | `ppf-master/ppfdev/makeppf_src/makeppf3_{linux,vc}.c` |
 | PPF3 applier source | `ppf-master/ppfdev/applyppf_src/applyppf3_{linux,vc}.c` (also reimplements PPF1 and PPF2 apply) |
@@ -528,7 +528,7 @@ application's context; note that there is no correct answer.
 | Magic | `PPF10` | `PPF20` | `PPF30` | `PPF40` |
 | Encoding byte | `0x00` | `0x01` | `0x02` | `0xFF` |
 | Spec document exists | yes (ppf.txt) | yes (PPF2.txt) | yes (PPF3.txt) | no (only inline source comment) |
-| Creator source released | yes | no | yes | yes |
+| Creator source available to us | yes (pdx-ppf1) | no (only pdx-ppf2 binaries located) | yes (ppf-master) | yes (gs2-bugfixes-master) |
 | Header size | 56 | 1084 | 60 or 1084 | 60 |
 | Offset width on disk | 32-bit | 32-bit | 64-bit | 32-bit |
 | Max effective file size | ≤ 2 GB per ppf-doc.txt and era `fseek` limit | not declared in PPF2.txt; format fields are u32 so ≤ 4 GB-1 by inference | 2^63 − 1 per PPF3.txt | not declared; u32 offsets imply ≤ 4 GB-1 by inference |
