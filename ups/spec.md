@@ -3,9 +3,9 @@
 This is a clean writeup of the on-disk structure of a UPS patch,
 derived from byuu's authoritative specification document
 (`upstream/ups-spec.pdf`, dated 2008-04-18). Where this document and
-the PDF disagree, the PDF wins. The goal here is to have the spec
-facts in a form that cross-references slap's implementation modules
-and that flags edge cases the terse original spec doesn't address.
+the PDF disagree, the PDF wins. The goal is to have the spec facts
+in a form that flags edge cases the terse original spec doesn't
+address.
 
 ## Identity
 
@@ -34,8 +34,7 @@ and that flags edge cases the terse original spec doesn't address.
 [ patch CRC32                  ] 4 bytes, little-endian
 ```
 
-The input/output sizes are byuu-style variable-length integers (see
-`Slap.Binary.putByuuVarint` / `getByuuVarint`, shared with BPS). The
+The input/output sizes are byuu-style variable-length integers. The
 three CRC32s together form a fixed 12-byte footer. Blocks fill the
 space between the sizes and the footer; parsers detect end-of-blocks
 by comparing the patch-read pointer against `(file-size − 12)`.
@@ -94,11 +93,6 @@ output-size for XOR purposes. In particular:
   ignored (not written, since the output buffer is only output-size
   long).
 
-slap implements this in `Slap.UPS.Apply.xorSourceSlice` as a two-phase
-loop: an in-bounds phase that reads source bytes normally and XORs
-against `xorData`, and a zero-fill phase that writes `xorData` bytes
-verbatim (since `x XOR 0 = x`).
-
 ## Bi-directional patching
 
 This is the spec's headline feature and the reason for the XOR-based
@@ -111,19 +105,6 @@ Because XOR is self-inverse, applying the same block sequence to the
 output file produces the input file. The only thing that changes
 direction-wise is which declared size the user's file should match
 and which declared CRC32 it should verify against.
-
-**slap's handling of bi-directionality.** slap splits direction into
-two explicit commands: `slap apply` runs forward (input → output) and
-`slap undo` runs backward (output → input). This is a design choice,
-not a spec requirement. byuu's reference implementation (beat) and
-Flips detect direction automatically by checking the user-supplied
-file's size against both declared sizes. The spec describes the
-capability without prescribing the dispatch mechanism; both
-approaches are spec-faithful.
-
-See `Slap.SomePatch` — the `patchApply` closure runs `applyUPS`
-forward, and `patchUndo` reapplies the same patch to the target to
-recover the source (pure self-inverse).
 
 ## Footer
 
@@ -155,21 +136,13 @@ mechanism the spec explicitly describes is CRC-based.
 
 The spec uses SHOULD-level language ("should be verified"), not
 MUST. A patcher that skips CRC verification is not forbidden by the
-spec, just inferior. slap chooses to verify CRCs by default and
-downgrade them to warnings only under `--no-verify`.
+spec, just inferior.
 
 **The spec does NOT say** anything explicit about size verification.
 The sizes are described as "exact file sizes" (section 3.2), which
 means the encoded values are accurate — but the spec does not
 specify a procedure for what to do if the file the user supplies
 has a different size.
-
-slap populates `verifyFileSizeAdvisory` from the declared input size for the
-forward-apply path, which triggers a warn-level "size mismatch"
-diagnostic in `Main.verifySource` before the CRC hard-error fires.
-This gives the user a more specific message than "CRC mismatch"
-when the underlying problem is that they handed us the wrong file,
-without inventing a rejection requirement the spec doesn't state.
 
 ## Encoding pointers (varint)
 
@@ -189,15 +162,13 @@ def encode(offset):
   }
 ```
 
-This is the same encoding BPS uses, implemented in
-`Slap.Binary.putByuuVarint` / `getByuuVarint`. The subtract-one
-trick is what makes the encoding canonical: each value has exactly
-one valid byte representation, because the implicit `+128` (from
-the inverse of the `offset -= 1`) in the decoder's accumulator
-means any encoding with a leading-zero continuation byte decodes to
-a value in a strictly higher range than a shorter encoding would.
-Trying to encode `1` as `0x01 0x80` produces `129`, not a
-non-canonical `1`. See `Props.SpecConformance.prop_varintCanonical`.
+This is the same encoding BPS uses. The subtract-one trick is what
+makes the encoding canonical: each value has exactly one valid byte
+representation, because the implicit `+128` (from the inverse of the
+`offset -= 1`) in the decoder's accumulator means any encoding with
+a leading-zero continuation byte decodes to a value in a strictly
+higher range than a shorter encoding would. Trying to encode `1` as
+`0x01 0x80` produces `129`, not a non-canonical `1`.
 
 ## Expressible, in-practice-rare conditions
 
@@ -205,47 +176,18 @@ The format can represent these cases:
 
 - **Input size != output size.** Growth (input shorter) is handled
   by virtual zero-padding of input per the spec. Shrinkage (input
-  longer) is possible but requires the extra input bytes be zero
-  so they XOR cleanly with the nothing-follows region. slap's
-  `createUPS` rejects shrinkage where source tail has non-zero
-  bytes, with `UPSUnencodeablePair UPSSourceTailNonZero`.
-- **Empty patch (no blocks).** Input and output are identical. The
-  apply path's tail copy (source → target) handles this with zero
-  blocks. Round-trips cleanly.
+  longer) is possible but requires the extra input bytes be zero so
+  they XOR cleanly with the nothing-follows region.
+- **Empty patch (no blocks).** Input and output are identical.
+  Applying produces output bytewise equal to input.
 - **Last byte of output differs from last byte of input.** The
-  block terminator requires input[p] == output[p] at the position
-  after the last differing byte. If the last byte of output differs
-  from input, there's no valid terminator position within the file.
-  slap's `createUPS` rejects this with `UPSUnencodeablePair
-  UPSLastByteDiffers`. byuu's beat handles this by extending the
-  implicit file by a virtual zero byte, which works because reads
-  past EOF are spec-defined to return zero.
-
-## Format-legal but structurally malformed
-
-The format lacks structural constraints that a well-formed patch
-would honor but that a hand-crafted or corrupted patch could
-violate:
-
-- **Block xorData containing 0x00.** The parser uses `getUntilByte
-  0x00` to split runs, so a 0x00 inside xorData effectively splits
-  that run into two separate blocks (the second with skip=0).
-  slap's `Slap.UPS.Types.UPSBlock` type documentation notes this is
-  a property of the encoded form, not an in-memory invariant.
-- **Block whose total span exceeds output size.** slap's
-  `applyUPS` clips the out-of-bounds portion and continues;
-  `detectOOBBlocks` emits a warning at parse time. See
-  `Props.SpecConformance.upsApplyBlockPastTarget`.
-- **Block without a terminator before end of body.**
-  `getUntilByte` fails with "terminator not found at offset …". See
-  `Props.SpecConformance.upsBlockMissingTerminator`.
-- **Patch CRC32 mismatch.** Detected by `Slap.UPS.Parse.parseUPS`
-  before the body is even decoded. See
-  `Props.SpecConformance.upsWrongPatchCRC`.
-- **Input/output CRC32 mismatch with user-supplied file.** This is
-  caught at apply time by `Main.verifySource` (forward direction)
-  via `checkCRC`, which dies by default and warns under
-  `--no-verify`.
+  block terminator requires `input[p] == output[p]` at the position
+  after the last differing byte. When the differing run reaches the
+  end of output, no such position exists within `[0, output_size)`
+  — the terminator's "phantom" position lands at `output_size`,
+  which is consistent with the spec's "read past EOF returns 0"
+  rule. byuu's beat and other real-world UPS tools produce blocks
+  in this shape.
 
 ## Limitations of the format
 
@@ -256,11 +198,9 @@ violate:
   to smuggle a malicious patch past verification, but slap is not
   the right tool if this is a concern).
 - **No metadata fields.** UPS patches cannot carry author,
-  description, version, or any other metadata. The format is deliberately
-  minimalist per the spec's "easy to implement" design goal. When
-  converting a metadata-rich patch (BPS with manifest, NINJA1 with
-  info fields, etc.) to UPS, the metadata must be dropped. slap's
-  conversion contract system flags this as a dropped-field warning.
+  description, version, or any other metadata. The format is
+  deliberately minimalist per the spec's "easy to implement"
+  design goal.
 - **No compression.** The spec explicitly defers compression to
   external tools: *"The reason UPS does not include compression is
   because ZIP, RAR, and 7z have and will always do it better."*
@@ -268,16 +208,3 @@ violate:
   *"UPS is a finalized spec. Patches created will work with all
   future versions."* There is no version byte, no reserved space,
   and no way to negotiate features without breaking existing tools.
-
-## Cross-reference to slap modules
-
-| Concern                              | Module                       |
-|:-------------------------------------|:-----------------------------|
-| Parse (patch bytes → UPSPatch)       | `Slap.UPS.Parse`             |
-| Apply (UPSPatch + source → target)   | `Slap.UPS.Apply`             |
-| Create (source + target → UPSPatch)  | `Slap.UPS.Create`            |
-| Describe (UPSPatch → ExplainData)    | `Slap.UPS.Describe`          |
-| Types (UPSPatch, UPSBlock, lengths)  | `Slap.UPS.Types`             |
-| Varint codec                         | `Slap.Binary`                |
-| Verification plumbing                | `Slap.SomePatch`, `app/Main.hs` |
-| Spec conformance tests               | `test/Props/SpecConformance.hs` |

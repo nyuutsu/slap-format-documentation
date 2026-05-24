@@ -12,10 +12,6 @@ Cost: `O(targetSize)` bits for the mask, plus `O(K)` to build it from the record
 
 Not planned. The current approach is safe, reliable, and easy to reason about; the savings are small on typical inputs. Noted here in case the performance shape of some future use case changes.
 
-### SNESTool's lenient `PATC` magic check
-
-SNESTool's apply path validates the magic by checking for `PATC` rather than `PATCH`; the fifth byte is read and discarded. So, a `PATC?` would apply identically to `PATCH`. I don't think anything emits these & the patch is *probably* malformed. So this is not a strong candidate for supporting.
-
 ### Name of the format
 
 We've found that is probably the earliest tool: "SNES/FAMICOM utility". This tool says the name is "International Patch Standard".

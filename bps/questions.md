@@ -155,7 +155,7 @@ slap rejects overshoot as a structural parse error. A well-formed BPS patch tile
 
 `0x80` decodes to unsigned varint 0, which under the sign/magnitude scheme is sign-0 magnitude-0 — plain zero. `0x81` decodes to unsigned varint 1, which is sign-1 magnitude-0 — "negative zero." Both mean "add zero" semantically; they are indistinguishable in effect but distinct on the wire. Every other signed value has exactly one encoding.
 
-slap emits `0x80` canonically for zero-delta on create, and accepts `0x81` on parse with a warning (or info, once an info channel exists — see `notebook.md`). Same shape as IPS's zero-count RLE: accept, flag, never emit. The warning flags a patch as unusual.
+slap emits `0x80` canonically for zero-delta on create, and accepts `0x81` on parse with a warning. Same shape as IPS's zero-count RLE: accept, flag, never emit. The warning flags a patch as unusual.
 
 ## Degenerate but structurally valid patches
 

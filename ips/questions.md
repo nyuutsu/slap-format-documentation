@@ -20,7 +20,7 @@ Records appear in a patch in whatever order the encoder emitted them. The format
 
 **slap applies records in wire order, period.** No sorting, no reordering.
 
-If a patch's records aren't in offset order — call them unsorted — slap's plan is to emit a warning. Unsorted records are unusual and we want to tell the user. (Not yet implemented; see todos.md item 7.)
+If a patch's records aren't in offset order — call them unsorted — slap emits an `UnsortedRecords` warning naming the first out-of-order record. Unsorted records are unusual and we want to tell the user.
 
 Why wire order: reordering at apply time would change behavior when records overlap (see overlap entry — the clobber semantics depend on apply order). Any other choice introduces ambiguity that has to be enforced by convention rather than by the wire itself. Wire order is unambiguous.
 
@@ -30,7 +30,7 @@ Two records can name write regions that share one or more bytes. The format does
 
 **slap permits overlap. Later records in wire order clobber earlier ones** — a direct consequence of wire-order apply semantics (see record-order entry). This is the same behavior every applier in the ecosystem exhibits; nobody checks for overlap at apply time.
 
-Overlap is unusual in real-world patches — encoders typically emit disjoint regions — so slap's plan is to warn when it detects one. The warning is a hint that the patch is shaped oddly; the apply still succeeds. (Not yet implemented; see todos.md item 6.)
+Overlap is unusual in real-world patches — encoders typically emit disjoint regions — so slap emits an `OverlappingRecords` warning carrying the count of intersecting pairs. The warning is a hint that the patch is shaped oddly; the apply still succeeds.
 
 slap never emits overlapping records; any overlap the parser sees comes from patches produced by other tools.
 
