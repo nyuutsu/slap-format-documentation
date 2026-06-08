@@ -2,7 +2,7 @@
 
 The APS-N64 type-1 header copies the N64 ROM's country byte (ROM header offset `0x3E`) for source verification. The APS spec itself does not enumerate the byte's values, and the third-party fan resources that do enumerate it disagree with each other. The labels in `Slap.APSN64.Types.apsN64CountryName` were reconciled by mining a N64 ROM set: reading each ROM's `0x3E` byte and correlating it with the region the ROM is independently known to target.
 
-## Verified against the corpus
+## Verified against the patches we have
 
 These mappings held with no exceptions across the set:
 
@@ -34,6 +34,6 @@ So all four render as "Europe", with the letter shown to keep the SKU distinguis
 
 ## Documented but unconfirmed
 
-No samples for these appeared in the corpus; they are carried from the fan documentation as best-effort labels and have not been verified here: Beta (`0x37`), China (`0x43`), Gateway 64 NTSC (`0x47`), Netherlands (`0x48`), Korea (`0x4B`), Gateway 64 PAL (`0x4C`), Canada (`0x4E`), Scandinavia (`0x57`).
+No samples for these appeared among the patches we have; they are carried from the fan documentation as best-effort labels and have not been verified here: Beta (`0x37`), China (`0x43`), Gateway 64 NTSC (`0x47`), Netherlands (`0x48`), Korea (`0x4B`), Gateway 64 PAL (`0x4C`), Canada (`0x4E`), Scandinavia (`0x57`).
 
 Any byte outside the table above is preserved verbatim as `APSN64CountryUnrecognized` and rendered as `unknown (0x__)`.

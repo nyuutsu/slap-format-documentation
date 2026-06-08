@@ -2,7 +2,7 @@
 
 Observations and recommendations about how slap should structure
 its PPF handling. Not a format specification — see `spec.md` for
-that. Not a research findings file — see `findings.md` for corpus
+that. Not a research findings file — see `findings.md` for field
 observations.
 
 ## Current state (as of this review)
@@ -182,5 +182,5 @@ all four versions have their own probes).
   code does.
 - User-facing CLI flags like `--format ppf3` / `--format ppf4`
   already exist and match the four-way naming.
-- The `findings.md` corpus observations stay as-is; they already
+- The `findings.md` field observations stay as-is; they already
   bucket by version.

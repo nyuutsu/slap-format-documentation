@@ -1,0 +1,79 @@
+# xdelta3 — design questions
+
+Questions specific to the xdelta3 arc (see `spec.md`): the wire features xdelta3 adds that RFC 3284 never defined. Cross-arc disagreements (version byte, both-source-bits, the compressor-declared-⇒-xdelta3 classification) live in the family `../questions.md`.
+
+This is the heaviest arc, because secondary compression is real implementation work, not a parsing nicety: ~55% of the patches we have use it, and the pre-rewrite module can apply none of it. Anchored to the xd3 source (decode path and the per-compressor headers); dispositions in bold below.
+
+## Secondary compression — the framing
+
+### A compressed section is `[dec_size varint][compressor-native stream]` — do we mirror xd3's consume-all and exact-output validations? `(one-right-answer-unknown)`
+
+xd3 wraps every secondary-compressed section uniformly (`xd3_decode_secondary`, xdelta3-second.h:118-169): the section's on-wire bytes begin with a varint `dec_size` (the decompressed length), then the compressor-native stream. After decompressing it validates two things — the decompressor must consume *all* input ("finished with unused input" otherwise) and produce *exactly* `dec_size` bytes ("short output" otherwise). The RFC defines none of this (§6: "assuming that any such compressed data has been decompressed"); it is pure xd3 convention we must match to read real patches. Do we enforce both as hard errors?
+
+**Both, as distinct errors.** A compressed section that finishes with input unconsumed, or produces a byte count other than its declared `dec_size`, contradicts its own framing — so both are hard errors, kept distinct (over-supplied input vs short output are different faults, mirroring xd3's "finished with unused input" / "short output"). Same self-consistency posture as the delta-encoding-length and leftover-section calls; never fires on a valid section. (`dec_size == 0` is the degenerate-compressed-section case — see the next question.)
+
+### Is each of the three sections decompressed independently, and what does a compressed-but-empty section mean? `(one-right-answer-unknown)`
+
+The Delta_Indicator bits mark each of data/inst/addr as compressed independently (core grammar). So a window can compress a subset. Confirm the three are wholly independent streams (each with its own `dec_size` prefix), and decide the degenerate case: a section flagged compressed whose length is 0, or whose `dec_size` is 0 (xd3 rejects `dec_size == 0` as "invalid output size", second.h) — error or no-op?
+
+**Independent by kind, continuous within a kind. Both degenerate cases: reject.** The three section-kinds (data/inst/addr) are independent of each other — each gated by its own Delta_Indicator bit, each its own secondary stream — so a window may compress any subset. But within a kind the stream is **continuous across windows**: a compressed section is a *slice* of its kind's ongoing stream, not a self-contained unit. Verified by concatenating a kind's sections (after stripping each `dec_size`) — they form one stream that decodes to the *sum* of their `dec_size`s, with the compressor header present only in the first window that compresses that kind and raw continuation chunks after. So a section is not independently decodable: decode feeds a kind's sections in order through one persistent decoder (slap, being in-memory, can equivalently concatenate a kind's sections and decode once). The per-section framing from the previous question still holds — each section is `[dec_size][bytes]`, its input fully consumed to yield exactly `dec_size` — only the decoder *state* carries across windows. (This carrying-over of state is how xdelta3 handles every compressor, not something specific to LZMA, so it presumably applies to DJW too — worth confirming when we get there.)
+
+A section flagged compressed but carrying no real payload is still malformed: at length 0 there's no `dec_size` to read (unparseable), and `dec_size == 0` is a category error — compressing nothing yields framing, never zero bytes, so a section cannot honestly decompress to empty. xd3 rejects both; we do too. Cost-free: 0 of 9,046 compressed sections in the patches we have hit either case (smallest real `dec_size` is 10).
+
+## Secondary compression — the compressors themselves
+
+### LZMA is xz/LZMA2 via liblzma — what decodes it under the pure-Rust-no-C-libs constraint, and does the framing match exactly? `(one-right-answer-unknown)` `(open-design)`
+
+xd3 doesn't use raw LZMA1 — it links liblzma and emits an **xz/LZMA2** stream: `LZMA_FILTER_LZMA2`, `lzma_stream_encoder(..., LZMA_CHECK_NONE)`, preset-derived options (xdelta3-lzma.h:23-73). So a compressed section's payload (after the `dec_size` prefix) is an xz container with check=none. slap's stance is pure-Rust deps, no system C libraries (rusty-slap) — which rules out wrapping liblzma. So: which decoder do we use (a pure-Rust xz/LZMA2, e.g. `lzma-rs`), and does it accept xd3's exact framing (LZMA2 filter, check-none)? Note the decode side is likely self-describing — an xz stream carries its own properties, so we probably *don't* need xd3's encode preset to decode — but that needs confirming, not assuming. (447 of the patches we have; second-most-common.)
+
+**Resolved: a pure-Rust library (`lzma-rs`) decodes all of it — no C library needed.** Tested against every LZMA patch we have: all 1,240 compressed streams across 440 patches decoded to exactly the size they declared. The catch is that these are not standalone `.xz` files (see the previous question): for each of the three kinds — data, instructions, addresses — the compressed data is *one continuous stream spread across all the windows*. The `.xz` header appears only in the first window that compresses that kind, the rest are bare continuation pieces, and there is no closing footer. Because of that, `lzma-rs`'s one-shot `xz_decompress` fails (it expects a complete, properly-closed `.xz` file), but its lower-level `lzma2_decompress` works. The approach that checked out (exact mechanics are an implementation detail): gather a kind's pieces in window order, drop the leading `.xz` header to expose the raw compressed data, mark where it ends, decode it all at once, then split the result back into per-section pieces by their declared sizes. `lzma-rs` works out its own buffer size, so nothing from the `.xz` header is needed; how much memory it may use belongs to the allocation-budget question, not this one.
+
+### DJW is bespoke multi-table Huffman with no library — how do we get it bit-exact, and where does it live? `(one-right-answer-unknown)`
+
+DJW (compressor id 1) is the **most common in the patches we have (2,265)** and has no external implementation: it's xdelta3's own static multi-table Huffman coder (xdelta3-djw.h credits bzip2's multi-table technique, zlib/ RFC 1951, Hirschberg-LeLewer prefix decoding). So decoding the majority of real xdelta3 patches means transcribing this decoder bit-for-bit from the xd3 source. Questions: does it live in Rust (byte-crunching → rusty-slap, per the language priority) or Haskell? How do we validate bit-exactness — round-trip against xd3-produced sections from real patches? And the DJW stream has its own internal framing (Huffman tables, run-length groups) inside the `dec_size`-prefixed section — that framing is undocumented except by the code, so the source *is* the spec here.
+
+**Yes — we write our own clean Rust decoder for it.** DJW has no library and no written spec — only xdelta3's code defines it — and it's the most common compressor (2,265 patches), so reading those patches means implementing its decoder from that source. But the source is the *specification*, not a template: the only hard requirement is that our decoded output matches xdelta3's byte-for-byte, and within that we write whatever Rust reads best — our own constructs and shape, not a line-by-line copy of the C. It lives on the Rust side (rusty-slap). We decode it the way every xdelta3 compressed piece is framed: each piece declares how many bytes it should produce, so we decompress to that size and stop. As with LZMA, a kind's pieces are probably one continuous stream across the windows rather than a fresh one per window — likely true here too, confirmed once we have a working decoder rather than assumed. Correctness is checked end-to-end: apply real DJW patches with our decoder and compare the finished ROM to xdelta3's, across all 2,265 patches. The implementation is the real work; the planning call is just "yes, our own Rust, output bit-exact, checked by ROM comparison."
+
+### FGK is marked "for demonstration purposes only" and appears zero times — we implement it anyway; what's the lightest correct path? `(open-design)`
+
+FGK (id 16) adaptive Huffman is, per its own header, "For demonstration purposes only" (xdelta3-fgk.h:16) — which is exactly why it's absent from the patches we have and from real encoders. We've decided to implement it regardless, for completeness. So this isn't a "should we" question; it's "what's the least-effort *correct* transcription," how we test something no patch exercises (synthesize FGK sections with xd3 itself?), and where it lives. The loneliest, most-correct FGK decoder in the ecosystem.
+
+**Same as DJW: our own clean Rust, output bit-exact.** FGK (id 16) is also xdelta3-only with no library — but its own source marks it "for demonstration only," and zero real patches use it; we implement it for completeness regardless. The posture matches DJW: xdelta3's code is the only definition, we owe identical decoded output, and the code shape is ours to make readable. The one real difference is testing — with no real FGK patches to check against, we generate our own: build xdelta3 with FGK switched on, have it compress sample data with `-S fgk`, then decode those and confirm we recover the input. (FGK has a working encoder, just compiled off by default, so it genuinely is testable.) Lightest correct path is a clean from-the-spec implementation; nothing in the wild stresses it, so there's no exotic case to chase.
+
+### Does slap *emit* any secondary compression on create? `(open-design)`
+
+Decoding compression is mandatory for interop; emitting it is a choice about what a slap-made patch is (cross-ref the family encoder-posture question). Do we ship create as uncompressed-only first (correct, larger patches) and add DJW/LZMA emission later, or is compressed output table-stakes? If we emit, which compressor by default, and at what preset?
+
+**Yes — settled with the encoder posture (family `questions.md`): DJW by default, kept per-section only where it actually shrinks the output, `--no-compress` to opt out.** Emission may be built after other parts of the rewrite, but it ships with them: it is a core feature, not future work. Encoder parameters are implementation.
+
+## Per-window Adler32
+
+### When and at what granularity do we compute and check the window Adler32, and which Adler-32 is it? `(one-right-answer-unknown)`
+
+The checksum is per-window — Adler-32 of *that window's* decoded output — positioned after the section lengths (xdelta3-decode.h, `DEC_CKSUM`). slap currently lifts each into a `WindowCheck` over the window's offset range in the whole target and verifies through the shared boundary. Is per-window-during-decode or after-the-fact the right point to check, and is the variant slap's FFI computes the standard Adler-32 (mod 65521) that xd3 uses? A mismatch in variant would fail every checksum.
+
+**Same checksum flavor — confirmed — so we verify it directly; check each window's output against its stored value.** xdelta3's per-window checksum is a standard Adler-32 (`A32_BASE 65521`, started at 1) over that window's decoded output. slap's FFI Adler-32 is the same standard variant (mod 65521, started at 1, same packing), so no variant mismatch — slap can check xd3's checksums as-is. We check each window's output bytes against the stored value. The natural moment is right after decoding each window (where xd3 does it, and where a bad window is caught immediately); checking afterward over the window's slice of the finished file gives the identical answer, so the timing is an implementation detail, not a decision. A mismatch is a real failure — it's the only integrity check VCDIFF has — so it is fatal by default; the opt-out modes are the next question.
+
+### Do we validate that the Adler bit and the 4-byte gap agree, and mirror xd3's verify-opt-out? `(open-design)`
+
+The patches we have show the `VCD_ADLER32` bit and the measured 4-byte gap agree in 111,645/111,645 windows — so the gap is a perfect corruption cross-check. Do we assert they agree (reject a bit-set-but-gap≠4, or gap=4-but-bit-clear) as a structural integrity check, or just trust the bit? Separately, xd3 has a runtime `XD3_ADLER32_NOVER` mode that consumes the checksum bytes without verifying — do we offer an equivalent opt-out (distinct from `--no-verify`'s fatal→warning downgrade)?
+
+**Trust the bit; `--no-verify` is the only override.** Read the bit to tell whether a window carries a checksum — no separate gap-vs-bit cross-check, since the delta-encoding-length check (Q5) already accounts for the 4 bytes exactly when the bit is set. A present checksum is verified by default; `--no-verify` downgrades a mismatch to a warning, like every other check. No separate skip-the-check mode.
+
+## Application header
+
+### Is the application header purely opaque-and-skipped, or does it become a slap metadata channel? `(open-design)`
+
+VCD_APPHEADER (Hdr bit 2) carries application-defined bytes — present in ~43% of the patches we have. We skip it to decode. But it's a real metadata channel in practice: LODModS stores source/target *file paths* there, and xd3 stores its own metadata. So: do we *expose* it (`info`/`explain`, an extract flag) the way BPS surfaces its metadata blob? Preserve it across convert? Ever *write* one on create? Does it plug into whatever metadata model slap grows, or stay strictly opaque? (Length is also an attacker-controlled allocation — same budget question as `dec_size`.)
+
+**A metadata channel, with the BPS treatment.** The bytes are formally opaque and never affect decoding, so slap carries them byte-exact: shown in `info`/`explain`, extractable, preserved on xdelta3→xdelta3 convert, settable or droppable by the usual metadata flags. BPS↔xdelta3 conversions carry the blob across — both formats define an anything-goes metadata area.
+
+Display makes a good-faith attempt to read the bytes as text, honoring `--metadata-encoding`; the patches we have include cp1252 prose here. BPS's UTF-8-only metadata classifier wants the same upgrade.
+
+Create writes no appheader by default. Some appliers read this field as a filename-and-compressor record when no output argument is given — so when a user supplies content of some other shape, create notes that other tools may misbehave if handed this patch without an output argument.
+
+The field can also ask the applier to recompress the output (none of the patches we have do). slap's output is always the bytes the instructions produce; if a patch asks for recompression, slap applies normally and notes the request it didn't honor.
+
+## Interleaved layout (resolved: not xdelta3's)
+
+**Settled by reading the source.** Interleaved layout is not an xdelta3 feature: "interleav" appears nowhere in the xdelta3 source, and the decoder reads three separate, contiguously-sized sections (`xd3_decode_sections`, `xdelta3-decode.h:633`, `698-705`) with no inline-operand path — an `A=0, C=0` window would starve those reads. It is also not RFC 3284's (§6 decodes three separate arrays). Interleaved is neither RFC's nor xdelta3's, never seen in the patches we have, and out of scope — the earlier "does xd3 decode it" and "is `A=0 ∧ C=0 ∧ I>0` a sound detector" questions are moot for this arc; there is nothing to detect.

@@ -102,8 +102,8 @@ little-endian on disk" after the fact. *(code: applyppf3_*.c;
 PPF2.txt declaration)*
 
 **Practical guidance for modern implementers**:
-- The LibCrypt corpus of 339 PPF1 patches we inspected is uniformly
-  PC-origin (LE on disk). That corpus appears to be collected from
+- The LibCrypt collection of 339 PPF1 patches we inspected is uniformly
+  PC-origin (LE on disk). That collection appears to be drawn from
   a single scene-mirror archive, so "all PC-origin" should be read
   as "all of the 339 files we looked at happen to be PC-origin" —
   not a statement about every PPF1 that exists.
@@ -206,8 +206,8 @@ literal mode and gives a single example. It does not mention the
 size-zero RLE clause that ppf.txt (PPF1) documents. The PPF3-era
 applier's `ApplyPPF2Patch` reads `anz` bytes unconditionally and
 never branches on `anz==0`, consistent with PPF2 having no RLE.
-No PPF2 patch in our corpus contains a size-zero record. *(doc,
-code: applyppf3_*.c, corpus: 41 PPF2 files)*
+No PPF2 patch we have contains a size-zero record. *(doc,
+code: applyppf3_*.c, observed: 41 PPF2 files)*
 
 ### FILE_ID.DIZ trailer *(doc: PPF2.txt)*
 
@@ -572,7 +572,7 @@ no conditional endian logic, so they would produce mutually-
 incompatible patches when run on their respective architectures.
 *(code)*
 
-Our corpus (339 PPF1s, PC/LE origin) contains no Amiga-origin
+The patches we have (339 PPF1s, PC/LE origin) contain no Amiga-origin
 examples. However: the Amiga PPF1 tool ships in Icarus's own
 distribution, and the tool remains discoverable online on period-
 correct PSX-scene mirror sites as of 2026. The combined evidence
@@ -590,7 +590,7 @@ equivalent) exists as an override for the Amiga case.
 
 PPF2.txt explicitly declares LE on disk and tells Amiga implementers
 to byte-swap. The shipped reference tools are DOS-only (no Amiga
-build). No BE PPF2 patches exist in our corpus. We default to LE and
+build). We have no BE PPF2 patches. We default to LE and
 do not attempt auto-detection; a hypothetical BE PPF2 would be
 indistinguishable from a corrupt LE PPF2 without knowing its
 provenance.
@@ -627,15 +627,15 @@ accept this (EOF immediately on the first record-read attempt).
 The reference applier only checks for `@END_FILE_ID.DIZ` (and only
 the tail `.DIZ` of it) before the length field. A patch with a
 correct end-marker and length but a missing `@BEGIN_FILE_ID.DIZ`
-would technically apply correctly under the reference. In-corpus
-PPF2/PPF3 patches all have both markers. *(code, corpus observation)*
+would technically apply correctly under the reference. The
+PPF2/PPF3 patches we have all carry both markers. *(code, field observation)*
 
 ### Out-of-order and overlapping records
 
 Neither the spec docs nor the reference code constrains record order
-or forbids overlap. In-corpus findings:
-- 4 PPF3 patches (out of 440) have non-monotonic offsets *(corpus)*
-- Zero patches have overlapping records *(corpus: all versions)*
+or forbids overlap. Among the patches we have:
+- 4 PPF3 patches (out of 440) have non-monotonic offsets *(observed)*
+- Zero patches have overlapping records *(observed: all versions)*
 
 The reference applier processes records sequentially in file order,
 so "later record wins" for overlapping bytes. This is implementation
@@ -664,7 +664,7 @@ For PPF2, PPF3, and PPF4, a record with count N=0 (meaning "write
 format forbids it, and the reference appliers would process the
 header (offset + size) and then read 0 data bytes before advancing
 to the next record. Zero-count records appear in zero patches of
-our corpus across all versions. *(code, corpus: 339 PPF1 / 41 PPF2 /
+the patches we have, across all versions. *(code, observed: 339 PPF1 / 41 PPF2 /
 440 PPF3 / 131 PPF4)*
 
 For PPF1 specifically, size=0 is not "write 0 bytes" — it's the

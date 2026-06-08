@@ -32,14 +32,14 @@ README).
 
 ## Real-world impact
 
-Surfaced during romhacking.net corpus research:
+Surfaced while researching the romhacking.net patches:
 
 - **UPS**: ff2iset ships separate `(Header).ups` and `(No Header).ups`
   for the same hack. The format can't express "strip 512 bytes first."
 - **BPS**: NES patches break when No-Intro migrates dumps from iNES
   1.0 to NES 2.0 headers (same ROM data, different header bytes,
   CRC changes).
-- **xdelta1**: not observed in corpus, but same structural problem
+- **xdelta1**: not observed among the patches we have, but same structural problem
   applies.
 
 ## Proposed feature

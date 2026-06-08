@@ -59,10 +59,10 @@ NUPS, Flips) was lenient here; slap was the outlier.
 ### No shrink patches in the wild
 
 The UPS spec supports `output_size < input_size` but zero patches in
-the romhacking.net corpus (192 files) exercise this. The shrink code
+the romhacking.net collection (192 files) exercise this. The shrink code
 path is tested only by synthesized data.
 
-## Corpus research
+## Field research
 
 Detailed empirical findings in `findings.md` in this directory.
 Key results: 8/8 CRC-matched patches apply successfully (4 clean,

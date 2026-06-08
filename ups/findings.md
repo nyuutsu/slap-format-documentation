@@ -103,8 +103,8 @@ that put OOB squarely on the undo path missed that the same
 structural rule produces it in apply direction whenever the
 target is the smaller side.
 
-Magnitudes from the corpus (undo direction; no shrink patches
-exist in the corpus to exercise the apply-of-shrink direction):
+Magnitudes from the patches we have (undo direction; no shrink patches
+exist among them to exercise the apply-of-shrink direction):
 
 - **smbs undone** (target 73,744 → source 40,976): 897 OOB
   blocks; max single-block overshoot **8,222 bytes** (block 803
@@ -157,7 +157,7 @@ against that direction's output size — forward against
 ## Structural properties
 
 - **Growth**: common (ROM expansion). FE1+2_GBA grows 16 MB to 33 MB.
-- **Shrink**: zero found in entire corpus. The apply-of-shrink
+- **Shrink**: zero found among all the patches we have. The apply-of-shrink
   path for phantom-tail OOB is therefore unexercised in real data,
   even though it is structurally identical to undo-of-growth.
 - **Block-stream underfill**: all 25 curated patches' block streams
@@ -171,7 +171,7 @@ against that direction's output size — forward against
   contiguous tail (in practice, the single final block).
 - **Phantom-tail OOB**: structurally produced whenever
   `output_size < max(source, target)`. Unmeasured in apply
-  direction (no shrink patches in the corpus). Massive in undo
+  direction (no shrink patches among them). Massive in undo
   direction for growth patches.
 - **Dual format**: some archives ship both IPS + UPS (smbs,
   ff2iset). Cross-validation opportunity.

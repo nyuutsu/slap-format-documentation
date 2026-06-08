@@ -38,7 +38,7 @@ and then misinterprets the next 2 bytes (which are the RLE payload)
 as the start of the next record's offset. The resulting patch state
 is garbage from that point forward.
 
-**Practical scope**: no PPF1 patch in our 339-file corpus uses RLE.
+**Practical scope**: no PPF1 patch among our 339 files uses RLE.
 The reference PPF1 creator (`makeppf.c`) never emits RLE records.
 But the format permits them; a hand-crafted or non-reference-built
 PPF1 could use them legitimately. On such a patch slap silently

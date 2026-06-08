@@ -4,7 +4,7 @@ Source: 250 archives from romhacking.net (587 PPF files) + LibCrypt PPF Patches 
 
 ## PPF version distribution
 
-### From RHDN corpus (250 archives, 587 PPF files)
+### From the RHDN collection (250 archives, 587 PPF files)
 
 | Version | Count | Notes |
 |---------|------:|-------|
