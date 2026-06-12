@@ -41,19 +41,7 @@ If set, a 4-byte **big-endian Adler32** of the window's decoded target output is
 
 ### Secondary compression
 
-The *signaling* is core — Hdr_Indicator bit 0 declares a compressor id, and each window's Delta_Indicator bits say which of its three sections are compressed. xdelta3 supplies the rest, both of which the RFC leaves undefined: the per-section layout, and the catalog.
-
-**Per-section layout.** A compressed section is `[decompressed-size varint][compressor-native stream]`. The decoder reads the size, decompresses, and must consume the whole stream *and* emit exactly that many bytes; anything else is malformed (`xdelta3-second.h`, `xd3_decode_secondary`).
-
-**Catalog** — the algorithm each id names:
-
-| id | name | algorithm |
-|---:|------|-----------|
-| 1  | DJW  | xdelta3's own static Huffman (David J. Wheeler); no external library |
-| 2  | LZMA | xz/LZMA2 via liblzma (`lzma_stream_encoder`, check=none) — *not* raw LZMA1 |
-| 16 | FGK  | adaptive Huffman (Faller, Gallager, Knuth); marked "demonstration purposes only" in its own header, and never seen in the wild |
-
-The ids are not IANA-registered (`xdelta3.c`); an unknown one is rejected ("unknown secondary compressor ID"). DJW and LZMA are both common; FGK never appears. A patch may declare a compressor yet have no window use it (all Delta_Indicator bits clear) — still valid.
+The *signaling* is core — Hdr_Indicator bit 0 declares a compressor id, and each window's Delta_Indicator bits say which of its three sections are compressed. xdelta3 supplies the rest, all of which the RFC leaves undefined: the per-section framing, the catalog of compressor ids, and each compressor's stream shape. That layer has its own page, `secondary-compression.md`.
 
 Because the RFC registered no compressors, **a declared compressor id is in practice an xdelta3 signal**: naming a compressor means using xdelta3's catalog, so the patch is xdelta3 even if no window exercises it.
 
