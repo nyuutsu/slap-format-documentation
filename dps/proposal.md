@@ -105,11 +105,16 @@ values (0 = CopyFromROM, 1 = EnclosedData) and rejects anything else
 with a structured `SlapError`.
 
 **Why**: The format defines exactly two modes. The spec (such as it is)
-does not address unknown modes. `dpspatcher.exe`'s apply logic has a
-two-branch `if`/`else` on the mode byte -- mode 0 takes the CopyFromROM
-path, everything else falls through to EnclosedData. This is an
-implementation artifact (a missing bounds check in C), not a design
-decision to treat unknown modes as enclosed data.
+does not address unknown modes. `dpspatcher.exe`'s apply loop
+(disassembly of `_apply_patch`, `0x401bb4`–`0x401bd3`) is a three-way
+branch on the mode byte: mode 0 takes the CopyFromROM path, mode 1 takes
+the EnclosedData path, and anything else is *skipped* -- it consumes the
+mode byte and the 4-byte output offset, seeks the output there, then
+jumps back to the loop top without applying anything (and so desyncs on
+whatever follows). So the reference silently drops an unknown mode; it
+does *not* treat it as EnclosedData. Either way it is an artifact of an
+unchecked C loop (it gates only on `feof`, never on a read's return),
+not a design decision.
 
 slap's position: an unknown mode byte means the patch is either corrupt,
 hand-edited, or from an unrecognized format revision. All three cases

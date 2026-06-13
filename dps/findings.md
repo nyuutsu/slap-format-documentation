@@ -43,7 +43,18 @@ and dps.c. Disassembly reveals the apply logic:
     1 byte: mode
       mode 0 → CopyFromROM: 4B output offset, 4B source offset, 4B length
       mode 1 → EnclosedData: 4B output offset, 4B length, [length] bytes
-    No other modes defined. Spec does not address unknown modes.
+    No other modes defined. Spec does not address unknown modes; the
+    disassembly (_apply_patch, 0x401bb4-0x401bd3) SKIPS one — it consumes
+    the mode byte and 4B output offset, seeks the output, then continues
+    without applying (and desyncs on what follows). It does NOT treat an
+    unknown mode as EnclosedData.
+
+    The record loop gates only on feof(patchFile) at the top, never on a
+    read's return value, so trailing bytes that can't form a record are
+    handled by luck: an unknown-mode lead byte is skipped harmlessly, but
+    a 0/1 lead byte enters a record path and executes with stale
+    offset/length (potential corruption). There is no clean "tolerate a
+    trailing fragment" semantics to match — slap rejects such a tail.
 
   Validation: size check only (ftell == orig_size). No checksums, no
   CRCs, no hashes. Feed it the wrong ROM of the right size → silent
