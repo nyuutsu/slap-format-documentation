@@ -1,1 +1,0 @@
-@.\php\php.exe .\php\ninja2.php %*
