@@ -1,12 +1,12 @@
 # xdelta1 — Format Specification
 
 There is no formal specification for xdelta1. This document is
-derived from the canonical source code (`xdelta-1.1.4` by Joshua
+derived from the canonical source code (`xdelta-1.1.3` by Joshua
 MacDonald, LGPL/GPL), specifically `xdmain.c`, `xdelta.h`, and
 `libedsio/default.c`. Where this document and the source disagree,
 the source wins.
 
-The canonical source is preserved at `upstream/` (the `xdelta-1.1.4`
+The canonical source is preserved at `upstream/` (the `xdelta-1.1.3`
 distribution). slap is, to our knowledge, the only other
 implementation.
 
