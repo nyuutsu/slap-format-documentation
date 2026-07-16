@@ -311,6 +311,11 @@ Max file size: spec says up to 2^63 − 1 bytes. *(doc)*
 Same shape as PPF2 but with **2-byte length** (uint16 LE), not 4.
 *(doc: "unsigned short (2 byte) with the length")*
 
+Content bound: `L ≤ 3072`, same as PPF2. PPF3.txt states it in prose —
+"A File_ID.diz file cannot exceed 3072 byte" — so the 2-byte length
+field, which could express 65535, is capped by the spec well under its
+wire width. *(doc: PPF3.txt)*
+
 ### Size-changing patches
 
 PPF3.txt does not contain prose rules about size matching. The

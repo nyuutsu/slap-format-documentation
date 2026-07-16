@@ -1,0 +1,477 @@
+<html class=" tlmycesf idc0_350"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <title> Generic Diff Format Specification </title>
+</head>
+<body bgcolor="#ffffff" text="#000000">
+<p align="right">
+<b><big>NOTE-GDIFF</big></b>
+</p><h1 align="CENTER">
+  Generic Diff Format Specification
+</h1>
+<h3>
+  <a href="https://www.w3.org/Submission/">Submitted to W3C August 21, 1997</a>
+</h3>
+<dl>
+  <dt>
+    This document is available at:
+  </dt><dd>
+    <a href="https://www.w3.org/TR/NOTE-gdiff-19970901">http://www.w3.org/TR/NOTE-gdiff-19970901</a>
+  </dd><dt>
+    Editors:
+  </dt><dd>
+    <a href="mailto:avh@marimba.com">Arthur van Hoff</a>,
+    <a href="http://www.marimba.com/">Marimba Inc</a>.
+  </dd><dd>
+    <a href="mailto:jpayne@marimba.com">Jonathan Payne</a>,
+    <a href="http://www.marimba.com/">Marimba Inc</a>.
+</dd></dl>
+<p>
+  </p><hr>
+<h2>
+  Status of this Document
+</h2>
+<p>
+This document is a NOTE made available by the W3 Consortium for discussion
+only. This indicates no endorsement of its content, nor that the Consortium
+has, is, or will be allocating any resources to the issues addressed by the
+NOTE.
+</p><p>
+This document is a submission to W3C from Marimba. Please see
+<a href="https://www.w3.org/Submission/#s1997-8">Acknowledged Submissions
+to W3C </a> regarding its disposition.
+</p><h2>
+  Abstract
+</h2>
+<p>
+This document provides a specification of a generic file format for representing
+the differences between two files.
+</p><h2>
+  Table of Contents
+</h2>
+<p>
+1. Introduction
+</p><p>
+2. The Generic Diff Format
+</p><p>
+3. Conclusion
+</p><p>
+3.1 References
+</p><h2>
+  1. Introduction
+</h2>
+<p>
+This document describes the Generic Diff Format (GDIFF). The GDIFF format
+can be used to efficiently describe the differences between two arbirary
+files. The format does not make any assumptions about the type or contents
+of the files, and thus can be used to describe the differences between text
+files as well as binary files. The GDIFF format is itself a binary file format.
+</p><p>
+This proposal does not describe how to compute the differences between two
+files. It only defines how the resulting differences can be described in
+an efficient and generic manner. The proposal describes the GDIFF file format
+and how to interpret it.
+</p><h2>
+  2. The Generic Diff Format
+</h2>
+<p>
+The GDIFF format is primarily useful in applications which compute the
+differences between two versions of a file. The resulting differences can
+be stored in a file using the GDIFF format. The differences described by
+the GDIFF file can later be applied to the old file to obtain the new file.
+</p><p>
+The GDIFF format is particularly useful in situations where it is more efficient
+to distribute the differences between two versions of a file, rather than
+the entire new version of the file.
+</p><p>
+Any file differencing algorithm can be used to compute the differences between
+the old and new versions of a file. An example is the
+<a href="http://cs.anu.edu.au/techreports/1996/TR-CS-96-05.html">rsync</a>
+algorithm. The result can be expressed using the GDIFF format that is described
+here.
+</p><p>
+To apply a GDIFF file, you need random access to the old version of the file,
+and sequential access to the GDIFF file. The new version of the file is produced
+on the output stream.
+</p><h3>
+  File Format
+</h3>
+<p>
+The GDIFF format is a binary format. The mime type of a GDIFF file is
+"application/gdiff". All binary numbers in a GDIFF file are stored in big
+endian format (most significant byte first).
+</p><p>
+Each diff stream starts with the 4-byte magic number (value
+<code>0xd1ffd1ff</code>), followed by a 1-byte version number (value 4).
+The version number is followed by a sequence of 1 byte commands which are
+interpreted in order. The last command in the stream is the end-of-file command
+(value 0).
+</p><p>
+The GDIFF commands are listed in the table below.
+</p><p>
+<table border="" cellspacing="2" bordercolor="#000000" cellpadding="2" width="100%">
+  <tbody><tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><b>Name</b></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><b></b>
+      <p>
+      Cmd</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><b></b>
+      <p>
+      Followed By</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><b></b>
+      <p>
+      Action</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      EOF</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      0</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      &nbsp;</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      End of File</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      1</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      1 byte</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append 1 data byte</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      2</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      2 bytes</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append 2 data bytes</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      &lt;n&gt;</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      &lt;n&gt; bytes</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append &lt;n&gt; data bytes</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      246</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      246 bytes</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append 246 data bytes</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      247</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      ushort, &lt;n&gt; bytes</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append &lt;n&gt; data bytes</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      DATA</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      248</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      int, &lt;n&gt; bytes</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      append &lt;n&gt; data bytes</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      249</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      ushort, ubyte</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      250</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      ushort, ushort</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      251</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      ushort, int</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      252</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      int, ubyte</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      253</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      int, ushort</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      254</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      int, int</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+  <tr>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      COPY</p></td>
+    <td width="9%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      255</p></td>
+    <td width="39%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      long, int</p></td>
+    <td width="42%" valign="TOP" bgcolor="#e0e0e0"><font face="Courier New" size="2"></font>
+      <p>
+      copy &lt;position&gt;, &lt;length&gt;</p></td>
+  </tr>
+</tbody></table>
+</p><p>
+There are two kinds of GDIFF commands. The first kind is the DATA command
+(1 through 248). Each data command is followed by a number of data bytes
+which are copied onto the output stream.
+</p><p>
+The second kind of GDIFF command is the COPY command (249 through 255). Each
+COPY command is followed by two arguments: position and length. The arguments
+specify the portion of the old file that must be copied onto the output stream.
+</p><p>
+If a number larger than <code>1^31-1</code> bytes is needed for a command
+that takes only <code>int</code> arguments, the command must be split into
+multiple commands. This may be necessary when dealing with very large files.
+</p><h3>
+  Types
+</h3>
+<ul>
+  <li>
+    <b>byte</b> - 8 bit signed
+  </li><li>
+    <b>ubyte</b> - 8 bit unsigned
+  </li><li>
+    <b>ushort</b> - 16 bit unsigned, most significant byte first
+  </li><li>
+    <b>int</b> - 32 bit signed, most significant byte first
+  </li><li>
+    <b>long</b> - 64 bit signed, most significant byte first
+</li></ul>
+<h3>
+  Example
+</h3>
+<p>
+To illustrate the use of the GDIFF format we will use two input streams
+<b>old</b> and <b>new</b> as an example and prepare a simple GDIFF file by
+hand:
+</p><p>
+<table border="" bordercolor="#000000" width="100%">
+  <tbody><tr>
+    <td valign="TOP" bgcolor="#e0e0e0" height="34"><pre>  
+
+           0   1   2   3   4   5   6   7   8   9
+
+  -----------------------------------------------
+
+   old:    A   B   C   D   E   F   G
+
+   new:    A   B   X   Y   C   D   B   C   D   E
+
+</pre>
+    </td>
+  </tr>
+</tbody></table>
+</p><p>
+A diff algorithm can be used to discover patterns which occur in both the
+old and new files, and a set of GDIFF commands can be computed:
+</p><p>
+<table border="" bordercolor="#000000" width="100%" bgcolor="#e0e0e0">
+  <tbody><tr>
+    <td align="CENTER" height="20" width="33%"><b>Comments</b></td>
+    <td align="CENTER" height="20" width="33%"><b>GDIFF</b></td>
+    <td align="CENTER" height="20" width="34%"><b>Output</b></td>
+  </tr>
+  <tr>
+    <td valign="TOP" height="34"><pre>  
+
+   magic
+
+   version
+
+   COPY 0, 2
+
+   DATA "XY"
+
+   COPY 2, 2
+
+   COPY 1, 4
+
+   EOF
+
+</pre>
+    </td>
+    <td valign="TOP" height="34"><pre>  
+
+   0xd1, 0xff, 0xd1, 0xff
+
+   4
+
+   249, 0, 0, 2
+
+   2, 'X', 'Y'
+
+   249, 0, 2, 2
+
+   249, 0, 1, 4
+
+   0
+
+</pre>
+    </td>
+    <td valign="TOP" height="34"><pre>  
+
+   
+
+   
+
+   A, B
+
+   X, Y
+
+   C, D
+
+   B, C, D, E
+
+
+
+</pre>
+    </td>
+  </tr>
+</tbody></table>
+</p><p>
+Note that in this case the resulting GDIFF file is larger than the new file.
+This is not normally the case when the files get larger. Also note that there
+can be many different GDIFF files which produce the same result. The size
+of the resulting GDIFF file largely depends on the similarity between the
+two input files, and the ability of the diff algorithm to find the most optimal
+set of differences.
+</p><h2>
+  3. Conclusion
+</h2>
+<p>
+The GDIFF format is a simple diff format that can efficiently describe the
+differences between a two files of any type. It is defined in this proposal
+to provide a simple interoperability format for binary differencing.
+</p><h2>
+  3.1 References
+</h2>
+<ul>
+  <li>
+    "SunOS diff.1"<br>
+    <a href="http://www.uwaterloo.ca/man/sunos/diff.1.html">http://www.uwaterloo.ca/man/sunos/diff.1.html</a>
+  </li><li>
+    "The rsync algorithm" by Andrew Tridgell and Paul Mackerras. <br>
+    <a href="http://cs.anu.edu.au/techreports/1996/TR-CS-96-05.html">http://cs.anu.edu.au/techreports/1996/TR-CS-96-05.html</a>
+  </li><li>
+    "HTTP: Delta-Encoding Notes" by Stephen Williams. <br>
+    <a href="http://ei.cs.vt.edu/~williams/DIFF/prelim.html">
+    http://ei.cs.vt.edu/~williams/DIFF/prelim.html </a>
+  </li><li>
+    "Potential benefits of delta encoding and data compression for HTTP" Jeffrey
+    C. Mogul, Fred Douglis, Anja Feldmann, and Balachander Krishnamurthy. Proceedings
+    SIGCOMM '97, Cannes, France <br>
+    <a href="http://ftp.digital.com/%7emogul/sigcomm97.ps">http://ftp.digital.com/%7emogul/sigcomm97.ps
+    </a> <br>
+    <a href="http://www.research.digital.com/wrl/techreports/abstracts/97.4.html">
+    http://www.research.digital.com/wrl/techreports/abstracts/97.4.html </a>
+</li></ul>
+<script src="Generic%20Diff%20Format%20Specification_files/fixup_kXDj.js"></script>
+</body></html>

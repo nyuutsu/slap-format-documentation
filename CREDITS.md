@@ -31,6 +31,12 @@ All files are from `bb-aps12.zip`, distributed circa December 1998 on dextrose.c
 
 table goes here
 
+### headers/upstream/
+
+| File | Author | Notes |
+|------|--------|-------|
+| `libretro-handy-cart.h` | K. Wilkins (Handy); libretro-handy maintainers | The LYNX_HEADER struct that defines the .lnx header format. zlib license (notice embedded in the file). Retrieved 2026-07-08 from [github.com/libretro/libretro-handy](https://github.com/libretro/libretro-handy/blob/master/lynx/cart.h) (`lynx/cart.h`), byte-identical copy. |
+
 ### ips/upstream/
 
 | File | Author | Notes |
