@@ -95,6 +95,8 @@ PPF2, Icarus/Paradox (≈October 1999 by the archive's internal file dates).
 
 *Regrettably*, I do not have the source code to this or any other comprehensive PPF2 implementation.
 
+Fun fact: the DOS tools can run on an 8088, *if* you also have an 8087.
+
 ### PPF3/upstream/
 
 | File | Author | Notes |
