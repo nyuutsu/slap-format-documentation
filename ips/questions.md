@@ -78,7 +78,7 @@ EBP is a sibling format that uses IPS records as its substrate. Same magic (`PAT
 
 - **slap supports EBP.** On parse, detect by shape (trailer starts with `{`); capture the JSON blob verbatim; extract the canonical fields (`patcher`, `title`, `author`, `description`) leniently if they're present.
 
-- **On create**, emit the four canonical fields with `"patcher":"slap"`. No custom fields.
+- **On create**, emit the four canonical fields with `"patcher":"EBPatcher"`. Tools treat that field as a format identifier, not a record of the creation tool; the reference tool hides the metadata unless it reads exactly `EBPatcher`. No custom fields.
 
 - **No shrinking inside EBP.** The format does not have truncation.
 
