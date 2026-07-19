@@ -8,7 +8,6 @@ Both functions populate a preallocated output buffer via `Data.ByteString.Intern
 
 Alternatives: pre-compute bounds-check pass (walks records twice, fine for typical sizes); push the apply loop into Rust (clean boundary but real implementation cost for marginal prettiness gain). If Rust grows an "apply record stream to buffer" primitive for performance reasons, inheriting the apply loop into it is the natural consolidation.
 
-
 ### A patch that can't be verified should say so, uniformly
 
 Three formats can arrive without verification data: PPF3 (validation block omitted), xdelta1 (`FLAG_NO_VERIFY`), and xdelta3 (Adler32 off — ~3% of the patches we have). Today only xdelta1 says anything — it emits `VerificationOptedOutByCreator` from parse. PPF3 is silent, even though that warning's own documentation names PPF3's absent block as a case it covers. The VCDIFF rewrite will want the same notice for an Adler-less xd3-arc patch.
