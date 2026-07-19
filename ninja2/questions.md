@@ -44,13 +44,13 @@ The stream ends at a `0x00`, but a truncated or malformed patch can run out befo
 
 NINJA2 is built to run either way: the XOR records are self-inverse, the overflow reverses (an `A` that appends going forward truncates coming back), and the two MD5s let a reader tell which file it holds and so which direction to take. `ninja2.php`, librup, and RomPatcher.js all do this — a target matching the modified-MD5 is un-patched back to the source.
 
-**slap applies forward only; it has no reverse path.** A NINJA2 patch reconstructs the target from the source, and that is all slap offers for the format today. This is a capability the format has and slap does not yet — a gap, not a decision that reverse is unwanted.
+**slap runs a patch in both directions: `slap undo` hands the source back.** The direction is the verb's — apply goes forward, undo goes back — and the MD5s verify whichever end each direction claims. A shrinking patch's discarded tail comes back from its truncate-mode overflow; a shrink whose overflow is append-mode never stored that tail, and is the one shape that cannot go back.
 
 ### Does slap handle multi-file patches?
 
 A single `.RUP` may carry several files: each `0x01` opens a new one, closing the previous. `ninja2.php`, librup, and RomPatcher.js all walk the whole list. The wild barely exercises it — one specimen in the survey is multi-file, and it is unreadable for a separate reason (see the preamble-variant question).
 
-**slap reads and writes single-file patches only.** It carries one file's records; it does not model the open-close-next walk a multi-file patch needs, and on create it always writes the single-file form. Another capability the format has and slap does not yet.
+**slap reads a multi-file patch whole and shows it; applying, undoing, and converting are single-file, and create writes only the single-file form.** `info` and `explain` count the bundle and give each further file its row, and every act refuses the bundle by name rather than patching against its first file alone.
 
 ### What does slap do with the pre-filespec 2045-byte preamble?
 
