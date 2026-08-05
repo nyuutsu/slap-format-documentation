@@ -31,9 +31,9 @@ The MIT license in `LICENSE` applies to our own writing. Upstream material in `u
 | `ninja1/` | NINJA 1.x | Derrick Sobodash's NINJA format, v1.x. |
 | `ninja2/` | NINJA 2.x | Derrick Sobodash's NINJA format, v2.x. Different from ninja1. |
 | `PPF1/` | PPF1 | PlayStation patch format by Icarus of Paradox. |
-| `PPF2/` | PPF2 | PlayStation patch format by Icarus of Paradox.. |
+| `PPF2/` | PPF2 | PlayStation patch format by Icarus of Paradox. |
 | `PPF3/` | PPF3 | PlayStation patch format by Icarus of Paradox. |
-| `PPF4/` | PPF4 | Pyriell's Playstation patch format. |
+| `PPF4/` | PPF4 | Pyriel's Playstation patch format. |
 | `ppf/` | PPF\* | Additional PPF material. |
 | `vcdiff/` | VCDIFF | Per RFC 3284 (Korn, MacDonald, Mogul, Vo, 2002). |
 | `vcdiff/` | xdelta3 | Joshua MacDonald's vcdiff implementation; adds some things and removes others |

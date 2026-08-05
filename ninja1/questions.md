@@ -16,6 +16,18 @@ The spec sheet describes the skip value as `unk.`, with a trailing period. `ninj
 
 **slap accepts both.** `unk` is the form in the patches themselves; `unk.` is the form a reader of the spec sheet would reach for. Honoring both costs nothing and closes the gap between them.
 
+### How many fields does a textual record line have, and what if one carries more?
+
+The spec sheet writes the line as `OFFSET PATCH_BYTES` and gives no third field a meaning. The reference applier splits it with `preg_split("/ /", ...)` and binds the result with `list($offset, $patch)`, which takes the first two fields; any beyond them go unused. Its own encoder writes exactly two, separated by one space, so no patch it produced has a third for that binding to meet.
+
+**slap refuses a line carrying more than two fields.** The format gives a third field no place, so a line holding one is malformed rather than generous. We could instead keep the first payload field as the reference does, but that binding follows from how `list()` fills its variables rather than from anything the format states, and taking it up would mean dropping bytes the line does carry without telling anyone.
+
+### May the offset and the payload be separated by more than one space?
+
+The spec sheet shows a single space and says nothing about runs. The reference splits on one space exactly, so a line padded with two produces three fields whose middle one is empty — and `list()` binds that empty field as the payload. Running the reference's own expression over `100  aabb` returns `offset="100"`, `payload=""`: the record writes nothing at all.
+
+**slap reads across the padding and takes the payload that follows, and warns that it has done so.** Reading the run as a separator is the interpretation under which the line means what it appears to mean, and the format says nothing about runs either way. But the same patch then writes different bytes depending on which tool applies it, and that is the user's business, so it warns rather than notes.
+
 ### What ROM type does a patch record for a platform the tool doesn't normalize?
 
 The spec sheet asks that a patcher without a normalization for some ROM type write `RAW` in the header, so every NINJA reader treats the patch the same way. `ninja.php` does this for ordinary-sized sources: building a patch for a type it has no procedure for (`nes`, `gba`, `n64`, …) against a source of 30 MiB or less, it records `raw`, so those names do not reach the wire. Above 30 MiB the maker follows a separate large-file path, which carries the declared type through. So in practice a NINJA1 header's type is `raw`, `snes`, `mega`, or `gb` for essentially every patch, with an un-normalized name reaching the wire only on the oversized-source path.

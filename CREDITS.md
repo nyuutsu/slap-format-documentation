@@ -109,7 +109,7 @@ Fun fact: the DOS tools can run on an 8088, *if* you also have an 8087.
 
 | File | Author | Notes |
 |------|--------|-------|
-| `gs2-bugfixes-master.zip` | Pyriell | Snapshot of [github.com/pyriell/gs2-bugfixes](https://github.com/pyriell/gs2-bugfixes), release 2.02.078 (dated 2019-01-03 in `version.txt`). |
+| `gs2-bugfixes-master.zip` | Pyriel | Snapshot of [github.com/pyriell/gs2-bugfixes](https://github.com/pyriell/gs2-bugfixes), release 2.02.078 (dated 2019-01-03 in `version.txt`). |
 
 ### ups/upstream/
 
